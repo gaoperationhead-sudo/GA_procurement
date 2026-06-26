@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sistem Procurement HRDGA PPP</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar no-print">
+      <div class="brand">
+        <img src="assets/logo-puri.jpg" alt="PT Puri Prima Persada">
+        <div>
+          <strong>Procurement</strong>
+          <span>HRDGA - PPP</span>
+        </div>
+      </div>
+      <nav>
+        <button class="nav-button active" data-view="dashboard">Dashboard</button>
+        <button class="nav-button" data-view="po">Purchase Order</button>
+        <button class="nav-button" data-view="spk">Surat Perintah Kerja</button>
+        <button class="nav-button" data-view="car">Cash Advance Request</button>
+        <button class="nav-button" data-view="pr">Payment Request</button>
+        <button class="nav-button" data-view="cac">Cash Advance Completion</button>
+        <button class="nav-button" data-view="vendors">Vendor & Payee</button>
+        <button class="nav-button" data-view="records">Record</button>
+      </nav>
+    </aside>
+
+    <main>
+      <header class="topbar no-print">
+        <div>
+          <h1>Sistem Pengajuan Procurement</h1>
+          <p>PO, SPK, CAR, Payment Request, dan pertanggungjawaban CAR.</p>
+          <p id="cloudStatus" class="cloud-status">Mode lokal</p>
+        </div>
+        <div class="top-actions">
+          <button id="exportData" class="ghost">Backup Data</button>
+          <label class="ghost file-button">
+            Restore Data
+            <input id="importData" type="file" accept="application/json">
+          </label>
+        </div>
+      </header>
+
+      <section id="dashboard" class="view active no-print">
+        <div class="metric-grid">
+          <article class="metric"><span>Total Record</span><strong id="metricTotal">0</strong></article>
+          <article class="metric"><span>PO</span><strong id="metricPO">0</strong></article>
+          <article class="metric"><span>CAR</span><strong id="metricCAR">0</strong></article>
+          <article class="metric"><span>PR</span><strong id="metricPR">0</strong></article>
+        </div>
+        <div class="panel">
+          <div class="panel-head compact-filter">
+            <h2>Periode Dashboard</h2>
+            <select id="dashboardMonth"></select>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Alur Pengajuan</h2>
+          </div>
+          <div class="flow-grid">
+            <div><b>Purchase Order</b><span>Isi item dan harga, lalu tarik data PO saat membuat Payment Request.</span></div>
+            <div><b>Cash Advance</b><span>Cash Advance Request, Payment Request, lalu Cash Advance Completion untuk tipe uang muka.</span></div>
+            <div><b>Register</b><span>Nomor otomatis: urut/departemen-PPP/jenis form/bulan romawi/tahun.</span></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Record Terbaru</h2>
+            <button data-view-jump="records" class="ghost">Lihat Semua</button>
+          </div>
+          <div id="recentRecords" class="record-list"></div>
+        </div>
+      </section>
+
+      <section id="po" class="view no-print"></section>
+      <section id="spk" class="view no-print"></section>
+      <section id="car" class="view no-print"></section>
+      <section id="pr" class="view no-print"></section>
+      <section id="cac" class="view no-print"></section>
+
+      <section id="vendors" class="view no-print">
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Vendor & Payee</h2>
+            <span class="mini">Data ini dipakai untuk pilihan Vendor di PO dan Payee di PR.</span>
+          </div>
+          <form id="vendorForm" class="form-grid">
+            <input type="hidden" name="id">
+            <div class="field">
+              <label>Nama Vendor atau Payee</label>
+              <input name="name" required placeholder="Nama vendor/payee">
+            </div>
+            <div class="field">
+              <label>Nomor Telepon</label>
+              <input name="phone" placeholder="Nomor telepon">
+            </div>
+            <div class="field">
+              <label>Jenis Bank</label>
+              <input name="bank" placeholder="Nama bank">
+            </div>
+            <div class="field">
+              <label>Nomor Rekening</label>
+              <input name="account" placeholder="Nomor rekening">
+            </div>
+            <div class="field">
+              <label>Nomor NPWP</label>
+              <input name="npwp" placeholder="Nomor NPWP">
+            </div>
+            <div class="field full">
+              <label>Alamat</label>
+              <textarea name="address" placeholder="Alamat vendor/payee"></textarea>
+            </div>
+            <div class="form-actions field full">
+              <button type="reset" class="ghost">Kosongkan</button>
+              <button type="submit" class="primary">Simpan Vendor / Payee</button>
+            </div>
+          </form>
+        </div>
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Daftar Vendor & Payee</h2>
+            <input id="vendorListSearch" class="list-search" placeholder="Cari vendor atau payee">
+          </div>
+          <div id="vendorList" class="record-list"></div>
+        </div>
+      </section>
+
+      <section id="records" class="view no-print">
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Record Sistem</h2>
+            <div class="filter-row">
+              <select id="recordFilter">
+                <option value="ALL">Semua Formulir</option>
+                <option value="PO">Purchase Order</option>
+                <option value="SPK">Surat Perintah Kerja</option>
+                <option value="CAR">Cash Advance Request</option>
+                <option value="PR">Payment Request</option>
+                <option value="CAC">Cash Advance Completion</option>
+              </select>
+              <select id="recordMonth"></select>
+              <select id="recordDepartment">
+                <option value="ALL">Semua Departemen</option>
+                <option value="HRDGA">HRDGA</option>
+                <option value="Operasional & network development">Operasional & Network Development</option>
+                <option value="Legal">Legal</option>
+                <option value="Finance & Accounting">Finance & Accounting</option>
+              </select>
+            </div>
+          </div>
+          <div id="allRecords" class="record-list"></div>
+        </div>
+      </section>
+
+      <section id="printArea" class="print-area"></section>
+    </main>
+  </div>
+
+  <div id="vendorModal" class="modal no-print" aria-hidden="true">
+    <div class="modal-card">
+      <div class="panel-head">
+        <h2>Pilih Vendor / Payee</h2>
+        <button id="closeVendorModal" class="ghost" type="button">Tutup</button>
+      </div>
+      <input id="vendorSearch" class="modal-search" placeholder="Cari nama vendor atau payee">
+      <div id="vendorChoices" class="record-list"></div>
+    </div>
+  </div>
+
+  <script src="cloud-config.js"></script>
+  <script src="cloud-store.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
