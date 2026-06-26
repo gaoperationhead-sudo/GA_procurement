@@ -34,6 +34,7 @@ let state = loadState();
 let activePrintId = null;
 let activeVendorTarget = null;
 let cloudReady = false;
+let appStarted = false;
 
 function loadState() {
   const fallback = { records: [], sequence: {}, vendors: [] };
@@ -93,6 +94,67 @@ async function loadCloudState() {
     cloudReady = false;
     updateCloudStatus("Cloud tidak tersambung, memakai data lokal");
   }
+}
+
+function setLoginMessage(message, isError = true) {
+  const target = byId("loginMessage");
+  if (!target) return;
+  target.textContent = message || "";
+  target.style.color = isError ? "var(--danger)" : "var(--accent)";
+}
+
+function showLogin() {
+  byId("loginScreen").classList.remove("auth-hidden");
+  byId("appShell").classList.add("auth-hidden");
+}
+
+function showApp(session) {
+  byId("loginScreen").classList.add("auth-hidden");
+  byId("appShell").classList.remove("auth-hidden");
+  const user = session?.user?.email || "";
+  if (byId("adminUser")) byId("adminUser").textContent = user ? `Admin: ${user}` : "";
+}
+
+function authIsRequired() {
+  return Boolean(window.ProcurementCloud?.enabled() && window.ProcurementCloud?.authRequired());
+}
+
+async function startApp(session = window.ProcurementCloud?.getSession?.()) {
+  if (appStarted) {
+    showApp(session);
+    return;
+  }
+  appStarted = true;
+  showApp(session);
+  await loadCloudState();
+  initForms();
+  renderMonthFilters();
+  renderDashboard();
+  renderRecords();
+  renderVendors();
+}
+
+async function handleLogin(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const email = form.elements.email.value.trim();
+  const password = form.elements.password.value;
+  setLoginMessage("Memeriksa login...", false);
+  try {
+    const session = await window.ProcurementCloud.signIn(email, password);
+    setLoginMessage("");
+    form.reset();
+    await startApp(session);
+  } catch (error) {
+    setLoginMessage(error.message || "Login gagal.");
+  }
+}
+
+function handleLogout() {
+  window.ProcurementCloud?.signOut?.();
+  cloudReady = false;
+  showLogin();
+  updateCloudStatus("Silakan login administrator");
 }
 
 function nextRegister(type, dateValue) {
@@ -822,7 +884,7 @@ function printTemplate(record) {
   return `
     <div class="print-sheet">
       <div class="print-header">
-        <img class="print-logo" src="assets/logo-puri.jpg" alt="">
+        <img class="print-logo" src="assets/logo-puri.jpg" onerror="this.onerror=null;this.src='Logo%20Puri.jpg';" alt="">
         <div class="company-detail">
           <div class="company-name">PT. Puri Prima Persada</div>
           <div>SEQUIS TOWER Lt. 6, Jalan Jendral Sudirman Kav. 71, Jakarta</div>
@@ -1024,6 +1086,8 @@ byId("closeVendorModal").addEventListener("click", closeVendorModal);
 byId("vendorModal").addEventListener("click", event => {
   if (event.target.id === "vendorModal") closeVendorModal();
 });
+byId("loginForm").addEventListener("submit", handleLogin);
+byId("logoutButton").addEventListener("click", handleLogout);
 
 byId("exportData").addEventListener("click", () => {
   const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
@@ -1054,12 +1118,18 @@ byId("importData").addEventListener("change", event => {
 });
 
 async function boot() {
-  await loadCloudState();
-  initForms();
-  renderMonthFilters();
-  renderDashboard();
-  renderRecords();
-  renderVendors();
+  if (authIsRequired()) {
+    const session = window.ProcurementCloud.getSession();
+    if (!session || !window.ProcurementCloud.isAdminEmail(session.user?.email)) {
+      showLogin();
+      updateCloudStatus("Silakan login administrator");
+      return;
+    }
+    await startApp(session);
+    return;
+  }
+  byId("loginScreen").classList.add("auth-hidden");
+  await startApp();
 }
 
 boot();

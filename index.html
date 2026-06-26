@@ -7,10 +7,28 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div class="app-shell">
+  <section id="loginScreen" class="login-screen no-print">
+    <form id="loginForm" class="login-card">
+      <img src="assets/logo-puri.jpg" onerror="this.onerror=null;this.src='Logo%20Puri.jpg';" alt="PT Puri Prima Persada">
+      <h1>Administrator Login</h1>
+      <p>Masuk untuk mengakses Sistem Procurement HRDGA PPP.</p>
+      <div class="field">
+        <label>Email</label>
+        <input name="email" type="email" required autocomplete="username" placeholder="admin@perusahaan.co.id">
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input name="password" type="password" required autocomplete="current-password" placeholder="Password">
+      </div>
+      <button class="primary" type="submit">Masuk</button>
+      <div id="loginMessage" class="login-message"></div>
+    </form>
+  </section>
+
+  <div id="appShell" class="app-shell auth-hidden">
     <aside class="sidebar no-print">
       <div class="brand">
-        <img src="assets/logo-puri.jpg" alt="PT Puri Prima Persada">
+        <img src="assets/logo-puri.jpg" onerror="this.onerror=null;this.src='Logo%20Puri.jpg';" alt="PT Puri Prima Persada">
         <div>
           <strong>Procurement</strong>
           <span>HRDGA - PPP</span>
@@ -36,6 +54,8 @@
           <p id="cloudStatus" class="cloud-status">Mode lokal</p>
         </div>
         <div class="top-actions">
+          <span id="adminUser" class="admin-user"></span>
+          <button id="logoutButton" class="ghost">Keluar</button>
           <button id="exportData" class="ghost">Backup Data</button>
           <label class="ghost file-button">
             Restore Data

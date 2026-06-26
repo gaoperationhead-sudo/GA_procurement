@@ -1,5 +1,6 @@
 (function () {
   const config = window.PROCUREMENT_CLOUD_CONFIG || {};
+  const AUTH_KEY = "procurement-auth-session-v1";
   let timer = null;
   let pendingState = null;
 
@@ -11,13 +12,65 @@
     return `${config.supabaseUrl.replace(/\/$/, "")}/rest/v1/procurement_app_state${query}`;
   }
 
+  function authEndpoint(path) {
+    return `${config.supabaseUrl.replace(/\/$/, "")}/auth/v1/${path}`;
+  }
+
+  function getSession() {
+    try {
+      const session = JSON.parse(localStorage.getItem(AUTH_KEY));
+      if (!session?.access_token) return null;
+      if (session.expires_at && session.expires_at * 1000 < Date.now()) {
+        localStorage.removeItem(AUTH_KEY);
+        return null;
+      }
+      return session;
+    } catch {
+      return null;
+    }
+  }
+
+  function isAdminEmail(email) {
+    const list = (config.adminEmails || []).map(item => String(item).toLowerCase());
+    return !list.length || list.includes(String(email || "").toLowerCase());
+  }
+
+  function authRequired() {
+    return Boolean(config.authRequired);
+  }
+
   function headers(extra = {}) {
+    const session = getSession();
     return {
       apikey: config.anonKey,
-      Authorization: `Bearer ${config.anonKey}`,
+      Authorization: `Bearer ${session?.access_token || config.anonKey}`,
       "Content-Type": "application/json",
       ...extra
     };
+  }
+
+  async function signIn(email, password) {
+    if (!enabled()) throw new Error("Cloud belum dikonfigurasi.");
+    const response = await fetch(authEndpoint("token?grant_type=password"), {
+      method: "POST",
+      headers: {
+        apikey: config.anonKey,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ email, password })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error_description || payload.msg || "Login gagal.");
+    if (!isAdminEmail(payload.user?.email)) {
+      signOut();
+      throw new Error("Email ini belum terdaftar sebagai administrator.");
+    }
+    localStorage.setItem(AUTH_KEY, JSON.stringify(payload));
+    return payload;
+  }
+
+  function signOut() {
+    localStorage.removeItem(AUTH_KEY);
   }
 
   async function load() {
@@ -58,5 +111,5 @@
     });
   }
 
-  window.ProcurementCloud = { enabled, load, save, persist };
+  window.ProcurementCloud = { enabled, authRequired, getSession, isAdminEmail, signIn, signOut, load, save, persist };
 })();
