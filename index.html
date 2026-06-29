@@ -55,6 +55,7 @@
         </div>
         <div class="top-actions">
           <span id="adminUser" class="admin-user"></span>
+          <button id="changePasswordButton" class="ghost">Ganti Password</button>
           <button id="logoutButton" class="ghost">Keluar</button>
           <button id="exportData" class="ghost">Backup Data</button>
           <label id="restoreDataLabel" class="ghost file-button admin-only">
@@ -189,6 +190,25 @@
       <input id="vendorSearch" class="modal-search" placeholder="Cari nama vendor atau payee">
       <div id="vendorChoices" class="record-list"></div>
     </div>
+  </div>
+
+  <div id="passwordModal" class="modal no-print" aria-hidden="true">
+    <form id="passwordForm" class="modal-card password-card">
+      <div class="panel-head">
+        <h2>Ganti Password</h2>
+        <button id="closePasswordModal" class="ghost" type="button">Tutup</button>
+      </div>
+      <div class="field">
+        <label>Password Baru</label>
+        <input name="password" type="password" required minlength="6" autocomplete="new-password" placeholder="Minimal 6 karakter">
+      </div>
+      <div class="field">
+        <label>Ulangi Password Baru</label>
+        <input name="confirmPassword" type="password" required minlength="6" autocomplete="new-password" placeholder="Ulangi password">
+      </div>
+      <button class="primary" type="submit">Simpan Password</button>
+      <div id="passwordMessage" class="login-message"></div>
+    </form>
   </div>
 
   <script src="cloud-config.js"></script>

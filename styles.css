@@ -482,6 +482,10 @@ textarea {
   box-shadow: 0 18px 44px rgba(23, 33, 43, .22);
 }
 
+.password-card {
+  width: min(430px, 100%);
+}
+
 .modal-search {
   width: 100%;
   border: 1px solid var(--line);

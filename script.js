@@ -104,6 +104,13 @@ function setLoginMessage(message, isError = true) {
   target.style.color = isError ? "var(--danger)" : "var(--accent)";
 }
 
+function setPasswordMessage(message, isError = true) {
+  const target = byId("passwordMessage");
+  if (!target) return;
+  target.textContent = message || "";
+  target.style.color = isError ? "var(--danger)" : "var(--accent)";
+}
+
 function showLogin() {
   byId("loginScreen").classList.remove("auth-hidden");
   byId("appShell").classList.add("auth-hidden");
@@ -171,6 +178,42 @@ function handleLogout() {
   document.body.classList.remove("is-admin");
   showLogin();
   updateCloudStatus("Silakan login");
+}
+
+function openPasswordModal() {
+  byId("passwordForm").reset();
+  setPasswordMessage("");
+  byId("passwordModal").classList.add("open");
+  byId("passwordModal").setAttribute("aria-hidden", "false");
+  byId("passwordForm").elements.password.focus();
+}
+
+function closePasswordModal() {
+  byId("passwordModal").classList.remove("open");
+  byId("passwordModal").setAttribute("aria-hidden", "true");
+}
+
+async function handlePasswordChange(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const password = form.elements.password.value;
+  const confirmPassword = form.elements.confirmPassword.value;
+  if (password !== confirmPassword) {
+    setPasswordMessage("Konfirmasi password tidak sama.");
+    return;
+  }
+  if (password.length < 6) {
+    setPasswordMessage("Password minimal 6 karakter.");
+    return;
+  }
+  setPasswordMessage("Menyimpan password baru...", false);
+  try {
+    await window.ProcurementCloud.updatePassword(password);
+    setPasswordMessage("Password berhasil diganti.", false);
+    setTimeout(closePasswordModal, 900);
+  } catch (error) {
+    setPasswordMessage(error.message || "Gagal mengganti password.");
+  }
 }
 
 function nextRegister(type, dateValue) {
@@ -1373,6 +1416,12 @@ byId("vendorModal").addEventListener("click", event => {
 });
 byId("loginForm").addEventListener("submit", handleLogin);
 byId("logoutButton").addEventListener("click", handleLogout);
+byId("changePasswordButton").addEventListener("click", openPasswordModal);
+byId("closePasswordModal").addEventListener("click", closePasswordModal);
+byId("passwordForm").addEventListener("submit", handlePasswordChange);
+byId("passwordModal").addEventListener("click", event => {
+  if (event.target.id === "passwordModal") closePasswordModal();
+});
 
 byId("exportData").addEventListener("click", () => {
   const blob = new Blob([JSON.stringify(exportableState(), null, 2)], { type: "application/json" });

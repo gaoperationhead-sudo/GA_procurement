@@ -69,6 +69,24 @@
     return payload;
   }
 
+  async function updatePassword(password) {
+    const session = getSession();
+    if (!enabled()) throw new Error("Cloud belum dikonfigurasi.");
+    if (!session?.access_token) throw new Error("Session login tidak ditemukan.");
+    const response = await fetch(authEndpoint("user"), {
+      method: "PUT",
+      headers: {
+        apikey: config.anonKey,
+        Authorization: `Bearer ${session.access_token}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ password })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error_description || payload.msg || "Gagal mengganti password.");
+    return payload;
+  }
+
   function signOut() {
     localStorage.removeItem(AUTH_KEY);
   }
@@ -111,5 +129,5 @@
     });
   }
 
-  window.ProcurementCloud = { enabled, authRequired, getSession, isAdminEmail, roleForSession, signIn, signOut, load, save, persist };
+  window.ProcurementCloud = { enabled, authRequired, getSession, isAdminEmail, roleForSession, signIn, signOut, updatePassword, load, save, persist };
 })();
