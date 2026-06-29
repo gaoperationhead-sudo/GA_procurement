@@ -32,7 +32,11 @@
 
   function isAdminEmail(email) {
     const list = (config.adminEmails || []).map(item => String(item).toLowerCase());
-    return !list.length || list.includes(String(email || "").toLowerCase());
+    return list.includes(String(email || "").toLowerCase());
+  }
+
+  function roleForSession(session) {
+    return isAdminEmail(session?.user?.email) ? "admin" : "user";
   }
 
   function authRequired() {
@@ -61,10 +65,6 @@
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload.error_description || payload.msg || "Login gagal.");
-    if (!isAdminEmail(payload.user?.email)) {
-      signOut();
-      throw new Error("Email ini belum terdaftar sebagai administrator.");
-    }
     localStorage.setItem(AUTH_KEY, JSON.stringify(payload));
     return payload;
   }
@@ -111,5 +111,5 @@
     });
   }
 
-  window.ProcurementCloud = { enabled, authRequired, getSession, isAdminEmail, signIn, signOut, load, save, persist };
+  window.ProcurementCloud = { enabled, authRequired, getSession, isAdminEmail, roleForSession, signIn, signOut, load, save, persist };
 })();

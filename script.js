@@ -35,6 +35,7 @@ let activePrintId = null;
 let activeVendorTarget = null;
 let cloudReady = false;
 let appStarted = false;
+let currentUser = { email: "", role: "guest" };
 
 function loadState() {
   const fallback = { records: [], sequence: {}, vendors: [] };
@@ -112,7 +113,15 @@ function showApp(session) {
   byId("loginScreen").classList.add("auth-hidden");
   byId("appShell").classList.remove("auth-hidden");
   const user = session?.user?.email || "";
-  if (byId("adminUser")) byId("adminUser").textContent = user ? `Admin: ${user}` : "";
+  currentUser = {
+    email: user,
+    role: window.ProcurementCloud?.roleForSession?.(session) || (user ? "user" : "admin")
+  };
+  if (byId("adminUser")) {
+    const label = currentUser.role === "admin" ? "Administrator" : "User";
+    byId("adminUser").textContent = user ? `${label}: ${user}` : "";
+  }
+  document.body.classList.toggle("is-admin", currentUser.role === "admin");
 }
 
 function authIsRequired() {
@@ -122,6 +131,11 @@ function authIsRequired() {
 async function startApp(session = window.ProcurementCloud?.getSession?.()) {
   if (appStarted) {
     showApp(session);
+    rebuildReferenceForms();
+    renderMonthFilters();
+    renderDashboard();
+    renderRecords();
+    renderVendors();
     return;
   }
   appStarted = true;
@@ -153,8 +167,10 @@ async function handleLogin(event) {
 function handleLogout() {
   window.ProcurementCloud?.signOut?.();
   cloudReady = false;
+  currentUser = { email: "", role: "guest" };
+  document.body.classList.remove("is-admin");
   showLogin();
-  updateCloudStatus("Silakan login administrator");
+  updateCloudStatus("Silakan login");
 }
 
 function nextRegister(type, dateValue) {
@@ -224,6 +240,29 @@ function monthOptions(selected) {
 function filterByMonth(records, selectedMonth) {
   if (!selectedMonth || selectedMonth === "ALL") return records;
   return records.filter(record => monthKey(record.date) === selectedMonth);
+}
+
+function isAdmin() {
+  return currentUser.role === "admin";
+}
+
+function canSeeRecord(record) {
+  if (isAdmin()) return true;
+  if (!currentUser.email) return true;
+  return String(record.createdByEmail || "").toLowerCase() === currentUser.email.toLowerCase();
+}
+
+function visibleRecords() {
+  return state.records.filter(canSeeRecord);
+}
+
+function exportableState() {
+  if (isAdmin()) return state;
+  return {
+    records: visibleRecords(),
+    sequence: state.sequence,
+    vendors: state.vendors
+  };
 }
 
 function renderMonthFilters() {
@@ -462,15 +501,16 @@ function referenceSelect(label, name, types) {
 }
 
 function referenceRecords(types) {
+  const records = visibleRecords();
   if (types.includes("CAC_SOURCE")) {
-    return state.records.filter(record => {
+    return records.filter(record => {
       if (record.type !== "PR") return false;
       const source = state.records.find(item => item.id === record.sourceId);
       return source?.type === "CAR" && source.carType === "Uang Muka";
     });
   }
   const usedSourceIds = new Set(state.records.filter(record => record.type === "PR" && record.sourceId).map(record => record.sourceId));
-  return state.records.filter(record => types.includes(record.type) && !usedSourceIds.has(record.id));
+  return records.filter(record => types.includes(record.type) && !usedSourceIds.has(record.id));
 }
 
 function applySigners(form) {
@@ -705,6 +745,8 @@ function handleSubmit(event) {
     type,
     register: nextRegister(type, data.date),
     createdAt: new Date().toISOString(),
+    createdByEmail: currentUser.email || "",
+    createdByRole: currentUser.role || "user",
     items,
     ...data
   };
@@ -831,7 +873,7 @@ function handleVendorSubmit(event) {
 
 function renderDashboard() {
   const month = byId("dashboardMonth")?.value || "ALL";
-  const dashboardRecords = filterByMonth(state.records, month);
+  const dashboardRecords = filterByMonth(visibleRecords(), month);
   const count = type => dashboardRecords.filter(record => record.type === type).length;
   byId("metricTotal").textContent = dashboardRecords.length;
   byId("metricPO").textContent = count("PO");
@@ -844,7 +886,8 @@ function renderRecords() {
   const filter = byId("recordFilter")?.value || "ALL";
   const selectedMonth = byId("recordMonth")?.value || "ALL";
   const selectedDepartment = byId("recordDepartment")?.value || "ALL";
-  const byForm = filter === "ALL" ? state.records : state.records.filter(record => record.type === filter);
+  const baseRecords = visibleRecords();
+  const byForm = filter === "ALL" ? baseRecords : baseRecords.filter(record => record.type === filter);
   const byDepartment = selectedDepartment === "ALL" ? byForm : byForm.filter(record => record.department === selectedDepartment);
   const records = filterByMonth(byDepartment, selectedMonth);
   byId("allRecords").innerHTML = recordCards(records);
@@ -857,6 +900,7 @@ function recordCards(records) {
       <div>
         <strong>${escapeHtml(FORM_TITLES[record.type])} - ${escapeHtml(record.register)}</strong>
         <div class="record-meta">${escapeHtml(formatDate(record.date))} | ${escapeHtml(record.requestor || "-")} | ${escapeHtml(record.location || "-")} | ${formatCurrencyValue(record.total, record.currency || "IDR")}</div>
+        ${isAdmin() && record.createdByEmail ? `<div class="record-meta">Dibuat oleh: ${escapeHtml(record.createdByEmail)}</div>` : ""}
         <div class="record-meta">${escapeHtml(record.subject || record.description || "")}</div>
       </div>
       <div class="record-actions">
@@ -868,7 +912,7 @@ function recordCards(records) {
 }
 
 function renderPrint(id) {
-  const record = state.records.find(item => item.id === id);
+  const record = visibleRecords().find(item => item.id === id);
   if (!record) return;
   activePrintId = id;
   byId("printArea").innerHTML = printTemplate(record);
@@ -1331,7 +1375,7 @@ byId("loginForm").addEventListener("submit", handleLogin);
 byId("logoutButton").addEventListener("click", handleLogout);
 
 byId("exportData").addEventListener("click", () => {
-  const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+  const blob = new Blob([JSON.stringify(exportableState(), null, 2)], { type: "application/json" });
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
   link.download = `backup-procurement-${new Date().toISOString().slice(0, 10)}.json`;
@@ -1340,6 +1384,11 @@ byId("exportData").addEventListener("click", () => {
 });
 
 byId("importData").addEventListener("change", event => {
+  if (!isAdmin()) {
+    alert("Restore data hanya bisa dilakukan oleh administrator.");
+    event.target.value = "";
+    return;
+  }
   const file = event.target.files[0];
   if (!file) return;
   const reader = new FileReader();
@@ -1361,9 +1410,9 @@ byId("importData").addEventListener("change", event => {
 async function boot() {
   if (authIsRequired()) {
     const session = window.ProcurementCloud.getSession();
-    if (!session || !window.ProcurementCloud.isAdminEmail(session.user?.email)) {
+    if (!session) {
       showLogin();
-      updateCloudStatus("Silakan login administrator");
+      updateCloudStatus("Silakan login");
       return;
     }
     await startApp(session);
