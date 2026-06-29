@@ -879,19 +879,151 @@ function metaRow(label, value) {
 }
 
 function printTemplate(record) {
+  if (record.type === "PO") return poPrintTemplate(record);
+  if (record.type === "CAR") return carPrintTemplate(record);
+  if (record.type === "PR") return prPrintTemplate(record);
+  return genericPrintTemplate(record);
+}
+
+function printHeaderBlock() {
+  return `
+    <div class="print-header">
+      <img class="print-logo" src="assets/logo-puri.jpg" onerror="this.onerror=null;this.src='Logo%20Puri.jpg';" alt="">
+      <div class="company-detail">
+        <div class="company-name">PT. Puri Prima Persada</div>
+        <div>SEQUIS TOWER Lt. 6, Jalan Jendral Sudirman Kav. 71, Jakarta</div>
+        <div>Phone: (021) 2524073 | Email: puriprimapersada@gmail.com</div>
+        <div>NPWP: 22.499.417.8-012.000</div>
+      </div>
+    </div>
+  `;
+}
+
+function printFooterBlock() {
+  return `
+    <div class="print-footer">
+      <strong>PT. PURI PRIMA PERSADA</strong><br>
+      SEQUIS TOWER Lt. 6, Jalan Jendral Sudirman Kav. 71, Jakarta<br>
+      Phone: (021) 2524073 | Email: puriprimapersada@gmail.com
+    </div>
+  `;
+}
+
+function poPrintTemplate(record) {
+  const tax = taxSummary(record);
+  return `
+    <div class="print-sheet po-sheet">
+      ${printHeaderBlock()}
+      <div class="po-title-row">
+        <div>
+          <div class="print-title left-title">Purchase Order</div>
+          <div class="mini">Dokumen pemesanan barang atau jasa</div>
+        </div>
+        <table class="meta-table po-number-box">
+          ${metaRow("No. PO", record.register)}
+          ${metaRow("Tanggal", formatDate(record.date))}
+          ${metaRow("Jenis PO", record.poType)}
+          ${metaRow("No PR Ref", record.prRef || "-")}
+        </table>
+      </div>
+      <div class="po-party-grid">
+        <div class="border-box">
+          <strong>Vendor</strong>
+          <div>${escapeHtml(record.vendor || "-")}</div>
+        </div>
+        <div class="border-box">
+          <strong>Pengajuan</strong>
+          <div>${escapeHtml(record.requestor || "-")} | ${escapeHtml(record.department || "-")}</div>
+          <div>${escapeHtml(record.location || "-")}</div>
+          <div>${escapeHtml(record.currency || "IDR")} | Kurs ${plainNumber(record.exchangeRate || 1)}</div>
+        </div>
+      </div>
+      ${poItemTable(record)}
+      <div class="section-label">Catatan</div>
+      <div class="note-box">${escapeHtml(record.description || "")}</div>
+      ${taxLines(record, tax)}
+      ${signatureBlock(record)}
+      ${printFooterBlock()}
+    </div>
+  `;
+}
+
+function carPrintTemplate(record) {
+  const tax = taxSummary(record);
+  return `
+    <div class="print-sheet car-sheet">
+      <div class="car-title">Cash Advance Request</div>
+      <div class="car-subtitle">PT. Puri Prima Persada</div>
+      <div class="car-meta-grid">
+        <table class="meta-table">
+          ${metaRow("Tipe", record.carType)}
+          ${metaRow("Tujuan", record.purpose)}
+          ${metaRow("Keterangan", record.description)}
+          ${metaRow("Total Permintaan", formatCurrencyValue(tax.total, record.currency || "IDR"))}
+        </table>
+        <table class="meta-table">
+          ${metaRow("No. Permintaan", record.register)}
+          ${metaRow("Tanggal Permintaan", formatDate(record.date))}
+          ${metaRow("Yang Mengajukan", record.requestor)}
+          ${metaRow("Rank", record.rank)}
+          ${metaRow("Departement", record.department)}
+        </table>
+      </div>
+      ${scheduleTable(record)}
+      ${carTransactionTable(record)}
+      ${taxLines(record, tax)}
+      ${signatureBlock(record)}
+      ${printFooterBlock()}
+    </div>
+  `;
+}
+
+function prPrintTemplate(record) {
+  const tax = taxSummary(record);
+  const source = record.sourceId ? state.records.find(item => item.id === record.sourceId) : null;
+  return `
+    <div class="print-sheet pr-sheet">
+      <div class="pr-heading">
+        <div>
+          <div class="print-title left-title">Request for Payment</div>
+          <div class="mini">Please attach all relevant supporting documents</div>
+        </div>
+        <table class="meta-table pr-number-box">
+          ${metaRow("Form No", record.register)}
+          ${metaRow("Date", formatDate(record.date))}
+          ${metaRow("Reference", source?.register || record.sourceRegister || "-")}
+        </table>
+      </div>
+      <div class="pr-payee-box">
+        <table class="meta-table">
+          ${metaRow("Payee", record.payee)}
+          ${metaRow("Bank", record.bank)}
+          ${metaRow("No Rekening", record.account)}
+          ${metaRow("Currency", record.currency || "IDR")}
+          ${metaRow("Kurs", plainNumber(record.exchangeRate || 1))}
+        </table>
+        <table class="meta-table">
+          ${metaRow("Requestor", record.requestor)}
+          ${metaRow("Department", record.department)}
+          ${metaRow("Cost Center", record.costCenter)}
+          ${metaRow("Location", record.location)}
+          ${metaRow("Description", record.description)}
+        </table>
+      </div>
+      ${prPaymentTable(record)}
+      ${taxLines(record, tax)}
+      ${signatureBlock(record)}
+      ${printFooterBlock()}
+    </div>
+  `;
+}
+
+function genericPrintTemplate(record) {
   const tax = taxSummary(record);
   const source = record.sourceId ? state.records.find(item => item.id === record.sourceId) : null;
   return `
     <div class="print-sheet">
-      <div class="print-header">
-        <img class="print-logo" src="assets/logo-puri.jpg" onerror="this.onerror=null;this.src='Logo%20Puri.jpg';" alt="">
-        <div class="company-detail">
-          <div class="company-name">PT. Puri Prima Persada</div>
-          <div>SEQUIS TOWER Lt. 6, Jalan Jendral Sudirman Kav. 71, Jakarta</div>
-          <div>Phone: (021) 2524073 | Email: puriprimapersada@gmail.com</div>
-          <div>NPWP: 22.499.417.8-012.000</div>
-        </div>
-      </div>
+      ${printHeaderBlock()}
       <div class="print-title">${escapeHtml(FORM_TITLES[record.type])}</div>
       <div class="print-meta">
         <table class="meta-table">
@@ -922,12 +1054,121 @@ function printTemplate(record) {
       ${record.type === "SPK" ? spkDetail(record) : itemTable(record)}
       ${taxLines(record, tax)}
       ${signatureBlock(record)}
-      <div class="print-footer">
-        <strong>PT. PURI PRIMA PERSADA</strong><br>
-        SEQUIS TOWER Lt. 6, Jalan Jendral Sudirman Kav. 71, Jakarta<br>
-        Phone: (021) 2524073 | Email: puriprimapersada@gmail.com
-      </div>
+      ${printFooterBlock()}
     </div>
+  `;
+}
+
+function poItemTable(record) {
+  return `
+    <div class="section-label">Rincian Purchase Order</div>
+    <table class="print-table po-item-table">
+      <thead>
+        <tr>
+          <th style="width:34px">No</th>
+          <th style="width:120px">Kode Barang/Jasa</th>
+          <th>Nama Barang/Jasa</th>
+          <th style="width:70px">Qty</th>
+          <th style="width:115px">Harga</th>
+          <th style="width:125px">Jumlah</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${record.items.map((item, index) => {
+          const total = Number(item.price || 0) * Number(item.qty || 0);
+          return `<tr>
+            <td class="num">${index + 1}</td>
+            <td></td>
+            <td>${escapeHtml(item.name)}</td>
+            <td class="num">${plainNumber(item.qty)}</td>
+            <td class="money">${formatCurrencyValue(item.price, record.currency || "IDR")}</td>
+            <td class="money">${formatCurrencyValue(total, record.currency || "IDR")}</td>
+          </tr>`;
+        }).join("")}
+      </tbody>
+    </table>
+  `;
+}
+
+function scheduleTable(record) {
+  return `
+    <div class="section-label">Lokasi dan Jadwal</div>
+    <table class="print-table schedule-table">
+      <thead>
+        <tr>
+          <th>Lokasi</th>
+          <th style="width:110px">Start Date</th>
+          <th style="width:110px">Close Date</th>
+          <th>Remark</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>${escapeHtml(record.location || "")}</td>
+          <td>${escapeHtml(formatDate(record.startDate))}</td>
+          <td>${escapeHtml(formatDate(record.closeDate))}</td>
+          <td>${escapeHtml(record.remark || record.description || "")}</td>
+        </tr>
+      </tbody>
+    </table>
+  `;
+}
+
+function carTransactionTable(record) {
+  return `
+    <div class="section-label">Rincian Cash Advance</div>
+    <table class="print-table car-transaction-table">
+      <thead>
+        <tr>
+          <th style="width:34px">No</th>
+          <th>Transaksi</th>
+          <th style="width:125px">Harga</th>
+          <th style="width:70px">Qty</th>
+          <th style="width:130px">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${record.items.map((item, index) => {
+          const total = Number(item.price || 0) * Number(item.qty || 0);
+          return `<tr>
+            <td class="num">${index + 1}</td>
+            <td>${escapeHtml(item.name)}</td>
+            <td class="money">${formatCurrencyValue(item.price, record.currency || "IDR")}</td>
+            <td class="num">${plainNumber(item.qty)}</td>
+            <td class="money">${formatCurrencyValue(total, record.currency || "IDR")}</td>
+          </tr>`;
+        }).join("")}
+      </tbody>
+    </table>
+  `;
+}
+
+function prPaymentTable(record) {
+  return `
+    <div class="section-label">Payment Detail</div>
+    <table class="print-table pr-payment-table">
+      <thead>
+        <tr>
+          <th style="width:34px">No</th>
+          <th>Description</th>
+          <th style="width:135px">Amount</th>
+          <th style="width:70px">Qty</th>
+          <th style="width:135px">Payment Request</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${record.items.map((item, index) => {
+          const total = Number(item.price || 0) * Number(item.qty || 0);
+          return `<tr>
+            <td class="num">${index + 1}</td>
+            <td>${escapeHtml(item.name)}</td>
+            <td class="money">${formatCurrencyValue(item.price, record.currency || "IDR")}</td>
+            <td class="num">${plainNumber(item.qty)}</td>
+            <td class="money">${formatCurrencyValue(total, record.currency || "IDR")}</td>
+          </tr>`;
+        }).join("")}
+      </tbody>
+    </table>
   `;
 }
 
