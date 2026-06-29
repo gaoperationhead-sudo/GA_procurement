@@ -181,6 +181,7 @@ function handleLogout() {
 }
 
 function openPasswordModal() {
+  if (!byId("passwordModal") || !byId("passwordForm")) return;
   byId("passwordForm").reset();
   setPasswordMessage("");
   byId("passwordModal").classList.add("open");
@@ -1401,6 +1402,18 @@ document.addEventListener("click", event => {
     state.vendors = state.vendors.filter(item => item.id !== deleteVendor.dataset.id);
     saveState();
   }
+
+  const changePassword = event.target.closest("#changePasswordButton");
+  if (changePassword) {
+    event.preventDefault();
+    openPasswordModal();
+  }
+
+  const closePassword = event.target.closest("#closePasswordModal");
+  if (closePassword) {
+    event.preventDefault();
+    closePasswordModal();
+  }
 });
 
 byId("recordFilter").addEventListener("change", renderRecords);
@@ -1416,10 +1429,10 @@ byId("vendorModal").addEventListener("click", event => {
 });
 byId("loginForm").addEventListener("submit", handleLogin);
 byId("logoutButton").addEventListener("click", handleLogout);
-byId("changePasswordButton").addEventListener("click", openPasswordModal);
-byId("closePasswordModal").addEventListener("click", closePasswordModal);
-byId("passwordForm").addEventListener("submit", handlePasswordChange);
-byId("passwordModal").addEventListener("click", event => {
+byId("changePasswordButton")?.addEventListener("click", openPasswordModal);
+byId("closePasswordModal")?.addEventListener("click", closePasswordModal);
+byId("passwordForm")?.addEventListener("submit", handlePasswordChange);
+byId("passwordModal")?.addEventListener("click", event => {
   if (event.target.id === "passwordModal") closePasswordModal();
 });
 
