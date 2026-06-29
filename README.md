@@ -36,6 +36,8 @@ Klik `Preview` untuk melihat hasil formulir, atau klik `Print / PDF` lalu pilih 
 
 PO, CAR, atau SPK yang sudah ditarik ke Payment Request tidak muncul lagi di referensi Payment Request berikutnya. Cash Advance Completion hanya menampilkan Payment Request dari CAR tipe `Uang Muka`.
 
+Payment Request yang sudah dibuat Cash Advance Completion tidak muncul lagi sebagai referensi CAC. Jika hasil Cash Advance Completion adalah `Kekurangan`, transaksi CAC tersebut muncul kembali di referensi Payment Request untuk pembayaran kekurangan.
+
 ## Vendor & Payee
 
 Daftarkan vendor atau penerima pembayaran di menu `Vendor & Payee`. Data yang disimpan meliputi nama, telepon, alamat, rekening, bank, dan NPWP.
@@ -53,6 +55,8 @@ Menu Record juga dapat difilter berdasarkan departemen pengaju. Preview/print do
 Jika `cloud-config.js` mengaktifkan `authRequired`, aplikasi menampilkan halaman login sebelum dashboard. User dibuat dari Supabase `Authentication > Users`.
 
 Email yang masuk ke `adminEmails` menjadi administrator dan dapat melihat semua transaksi. Email lain menjadi user biasa dan hanya melihat transaksi yang dibuat sendiri. Nomor transaksi tetap berlanjut bersama lintas user.
+
+User yang sedang login dapat mengganti password sendiri dari tombol `Ganti Password` di bagian atas aplikasi.
 
 ## Penyimpanan data
 

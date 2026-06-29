@@ -361,6 +361,26 @@ function totalItems(items, mode = "normal") {
   }, 0);
 }
 
+function completionSummary(items) {
+  return (items || []).reduce((summary, item) => {
+    summary.payment += Number(item.payment || 0);
+    summary.realization += Number(item.realization || 0);
+    return summary;
+  }, { payment: 0, realization: 0 });
+}
+
+function settlementFromItems(items) {
+  const summary = completionSummary(items);
+  if (summary.payment > summary.realization) return "Kelebihan";
+  if (summary.payment < summary.realization) return "Kekurangan";
+  return "Sesuai";
+}
+
+function shortageAmountFromCompletion(record) {
+  const summary = completionSummary(record.items || []);
+  return Math.max(0, summary.realization - summary.payment);
+}
+
 function taxSummary(record) {
   const subtotal = totalItems(record.items || [], record.type === "CAC" ? "completion" : "normal");
   const ppn = Number(record.ppn || 0);
@@ -536,7 +556,7 @@ function referenceSelect(label, name, types) {
           <label>${label}</label>
           <select name="${name}">
             <option value="">Tanpa referensi</option>
-            ${records.map(record => `<option value="${record.id}">${escapeHtml(record.register)} - ${escapeHtml(record.subject || record.description || FORM_TITLES[record.type])}</option>`).join("")}
+            ${records.map(record => `<option value="${record.id}">${escapeHtml(referenceLabel(record))}</option>`).join("")}
           </select>
         </div>
       </div>
@@ -547,14 +567,27 @@ function referenceSelect(label, name, types) {
 function referenceRecords(types) {
   const records = visibleRecords();
   if (types.includes("CAC_SOURCE")) {
+    const completedPrIds = new Set(state.records.filter(record => record.type === "CAC" && record.sourceId).map(record => record.sourceId));
     return records.filter(record => {
       if (record.type !== "PR") return false;
+      if (completedPrIds.has(record.id)) return false;
       const source = state.records.find(item => item.id === record.sourceId);
       return source?.type === "CAR" && source.carType === "Uang Muka";
     });
   }
   const usedSourceIds = new Set(state.records.filter(record => record.type === "PR" && record.sourceId).map(record => record.sourceId));
-  return records.filter(record => types.includes(record.type) && !usedSourceIds.has(record.id));
+  return records.filter(record => {
+    if (record.type === "CAC") return record.settlementType === "Kekurangan" && !usedSourceIds.has(record.id);
+    return types.includes(record.type) && !usedSourceIds.has(record.id);
+  });
+}
+
+function referenceLabel(record) {
+  const base = `${record.register} - ${record.subject || record.description || FORM_TITLES[record.type]}`;
+  if (record.type === "CAC" && record.settlementType === "Kekurangan") {
+    return `${base} - Kekurangan ${formatCurrencyValue(shortageAmountFromCompletion(record), record.currency || "IDR")}`;
+  }
+  return base;
 }
 
 function applySigners(form) {
@@ -627,7 +660,7 @@ function initForms() {
   });
   baseForm("PR", {
     heading: "Pengajuan Payment Request",
-    reference: referenceSelect("Referensi PO/CAR/SPK yang belum dibuat PR", "sourceId", ["PO", "CAR", "SPK"]),
+    reference: referenceSelect("Referensi PO/CAR/SPK atau Kekurangan CAC", "sourceId", ["PO", "CAR", "SPK", "CAC"]),
     extra: `
       ${vendorPickerField("payee", "Payee", "Pilih atau ketik payee")}
       <div class="field">
@@ -655,7 +688,7 @@ function initForms() {
       </div>
       <div class="field">
         <label>Status Selisih</label>
-        <select name="settlementType"><option>Kelebihan</option><option>Kekurangan</option><option>Sesuai</option></select>
+        <input name="settlementType" value="Sesuai" readonly>
       </div>`
   });
 
@@ -746,6 +779,12 @@ function updateFormTotal(form) {
   const currency = form.elements.currency?.value || "IDR";
   const label = form.querySelector(".table-total");
   if (label) label.textContent = `Subtotal: ${formatCurrencyValue(subtotal, currency)} | PPN: ${formatCurrencyValue(ppn, currency)} | PPh: ${formatCurrencyValue(pph, currency)} | Total: ${formatCurrencyValue(total, currency)}`;
+  updateSettlementType(form);
+}
+
+function updateSettlementType(form) {
+  if (form.dataset.type !== "CAC" || !form.elements.settlementType) return;
+  form.elements.settlementType.value = settlementFromItems(collectItems(form));
 }
 
 function fillFromReference(form, sourceId) {
@@ -770,7 +809,16 @@ function fillFromReference(form, sourceId) {
   applySigners(form);
   const table = form.querySelector(".item-table");
   table.querySelector("tbody").innerHTML = "";
-  source.items.forEach(item => addItemRow(table, item));
+  if (form.dataset.type === "PR" && source.type === "CAC" && source.settlementType === "Kekurangan") {
+    addItemRow(table, {
+      name: `Pembayaran kekurangan ${source.sourceRegister || source.register}`,
+      price: shortageAmountFromCompletion(source),
+      qty: 1
+    });
+    form.elements.description.value = `Pembayaran kekurangan realisasi ${source.sourceRegister || source.register}`;
+  } else {
+    source.items.forEach(item => addItemRow(table, item));
+  }
   updateFormTotal(form);
 }
 
@@ -800,6 +848,10 @@ function handleSubmit(event) {
   record.ppn = parseMoney(data.ppn);
   record.pph = parseMoney(data.pph);
   record.total = totalItems(items, type === "CAC" ? "completion" : "normal") + record.ppn - record.pph;
+  if (type === "CAC") {
+    record.settlementType = settlementFromItems(items);
+    record.shortageAmount = shortageAmountFromCompletion(record);
+  }
   record.subject = data.subject || data.purpose || data.carType || data.description || FORM_TITLES[type];
   state.records.unshift(record);
 
