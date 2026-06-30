@@ -853,6 +853,9 @@ function handleSubmit(event) {
     record.shortageAmount = shortageAmountFromCompletion(record);
   }
   record.subject = data.subject || data.purpose || data.carType || data.description || FORM_TITLES[type];
+  if (type === "PR") {
+    record.payee = payeeNameForRecord(record, source);
+  }
   state.records.unshift(record);
 
   saveState();
@@ -945,6 +948,26 @@ function fillVendorBankByName(form, name) {
   if (!vendor) return;
   if (form.elements.bank) form.elements.bank.value = vendor.bank || "";
   if (form.elements.account) form.elements.account.value = vendor.account || "";
+}
+
+function vendorNameByPaymentInfo(bank, account) {
+  const clean = value => String(value || "").replace(/\s+/g, "").toLowerCase();
+  const targetAccount = clean(account);
+  const targetBank = clean(bank);
+  const vendor = state.vendors.find(item => {
+    const sameAccount = targetAccount && clean(item.account) === targetAccount;
+    const sameBank = !targetBank || clean(item.bank) === targetBank;
+    return sameAccount && sameBank;
+  });
+  return vendor?.name || "";
+}
+
+function payeeNameForRecord(record, source) {
+  return record.payee
+    || vendorNameByPaymentInfo(record.bank, record.account)
+    || source?.vendor
+    || source?.payee
+    || "";
 }
 
 function handleVendorSubmit(event) {
@@ -1121,6 +1144,7 @@ function carPrintTemplate(record) {
 function prPrintTemplate(record) {
   const tax = taxSummary(record);
   const source = record.sourceId ? state.records.find(item => item.id === record.sourceId) : null;
+  const payeeName = payeeNameForRecord(record, source);
   return `
     <div class="print-sheet pr-sheet">
       <div class="pr-heading">
@@ -1136,7 +1160,7 @@ function prPrintTemplate(record) {
       </div>
       <div class="pr-payee-box">
         <table class="meta-table">
-          ${metaRow("Payee", record.payee)}
+          ${metaRow("Payee", payeeName)}
           ${metaRow("Bank", record.bank)}
           ${metaRow("No Rekening", record.account)}
           ${metaRow("Currency", record.currency || "IDR")}
