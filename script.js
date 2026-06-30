@@ -293,6 +293,7 @@ function isAdmin() {
 function canSeeRecord(record) {
   if (isAdmin()) return true;
   if (!currentUser.email) return true;
+  if (!record.createdByEmail) return true;
   return String(record.createdByEmail || "").toLowerCase() === currentUser.email.toLowerCase();
 }
 
@@ -1020,6 +1021,7 @@ function recordCards(records) {
         <strong>${escapeHtml(FORM_TITLES[record.type])} - ${escapeHtml(record.register)}</strong>
         <div class="record-meta">${escapeHtml(formatDate(record.date))} | ${escapeHtml(record.requestor || "-")} | ${escapeHtml(record.location || "-")} | ${formatCurrencyValue(record.total, record.currency || "IDR")}</div>
         ${isAdmin() && record.createdByEmail ? `<div class="record-meta">Dibuat oleh: ${escapeHtml(record.createdByEmail)}</div>` : ""}
+        ${isAdmin() && !record.createdByEmail ? `<div class="record-meta">Data lama: belum ada pemilik user</div>` : ""}
         <div class="record-meta">${escapeHtml(record.subject || record.description || "")}</div>
       </div>
       <div class="record-actions">
