@@ -38,6 +38,44 @@ let cloudReady = false;
 let appStarted = false;
 let currentUser = { email: "", role: "guest" };
 
+const REQUIRED_FIELDS = {
+  PO: [
+    ["date", "Tanggal"],
+    ["requestor", "Yang mengajukan"],
+    ["rank", "Rank"],
+    ["costCenter", "Cost center"],
+    ["department", "Departemen"],
+    ["location", "Lokasi"],
+    ["vendor", "Vendor"],
+    ["description", "Keterangan pengajuan"]
+  ],
+  CAR: [
+    ["date", "Tanggal"],
+    ["requestor", "Yang mengajukan"],
+    ["rank", "Rank"],
+    ["costCenter", "Cost center"],
+    ["department", "Departemen"],
+    ["location", "Lokasi"],
+    ["carType", "Tipe"],
+    ["purpose", "Tujuan penggunaan dana"],
+    ["description", "Keterangan pengajuan"],
+    ["startDate", "Start date"],
+    ["closeDate", "Close date"]
+  ],
+  PR: [
+    ["date", "Tanggal"],
+    ["requestor", "Yang mengajukan"],
+    ["rank", "Rank"],
+    ["costCenter", "Cost center"],
+    ["department", "Departemen"],
+    ["location", "Lokasi"],
+    ["payee", "Payee"],
+    ["bank", "Bank"],
+    ["account", "No rekening"],
+    ["description", "Keterangan pengajuan"]
+  ]
+};
+
 function loadState() {
   const fallback = { records: [], sequence: {}, vendors: [] };
   try {
@@ -476,19 +514,19 @@ function baseForm(type, config) {
         </div>
         <div class="field">
           <label>Rank</label>
-          <select name="rank">${optionList(RANKS, "Staff")}</select>
+          <select name="rank" required>${optionList(RANKS, "Staff")}</select>
         </div>
         <div class="field">
           <label>Cost Center</label>
-          <select name="costCenter">${optionList(COST_CENTERS, "HRDGA")}</select>
+          <select name="costCenter" required>${optionList(COST_CENTERS, "HRDGA")}</select>
         </div>
         <div class="field">
           <label>Departemen</label>
-          <select name="department">${optionList(COST_CENTERS, "HRDGA")}</select>
+          <select name="department" required>${optionList(COST_CENTERS, "HRDGA")}</select>
         </div>
         <div class="field">
           <label>Lokasi</label>
-          <select name="location">${optionList(LOCATIONS, "Head Office")}</select>
+          <select name="location" required>${optionList(LOCATIONS, "Head Office")}</select>
         </div>
         <div class="field">
           <label>Mata Uang</label>
@@ -770,6 +808,18 @@ function initForms() {
       if (event.target.name === "department") applySigners(form);
     });
     form.addEventListener("submit", handleSubmit);
+    form.addEventListener("reset", () => {
+      delete form.dataset.editId;
+      const hint = form.querySelector(".panel-head .mini");
+      const submit = form.querySelector('button[type="submit"]');
+      setTimeout(() => {
+        if (hint) hint.textContent = "Nomor dibuat otomatis saat disimpan";
+        if (submit) submit.textContent = "Simpan Pengajuan";
+        form.querySelector(".item-table tbody").innerHTML = "";
+        addItemRow(form.querySelector(".item-table"));
+        applySigners(form);
+      }, 0);
+    });
   });
 }
 
@@ -817,6 +867,41 @@ function collectItems(form) {
       qty: Number(get("itemQty") || 0)
     };
   }).filter(item => item.name || item.price || item.payment || item.realization);
+}
+
+function validateRequiredForm(form, items) {
+  const type = form.dataset.type;
+  const missing = [];
+  (REQUIRED_FIELDS[type] || []).forEach(([name, label]) => {
+    const value = form.elements[name]?.value;
+    if (!String(value || "").trim()) missing.push(label);
+  });
+
+  if (["PO", "CAR", "PR"].includes(type)) {
+    const tableRows = [...form.querySelectorAll(".item-table tbody tr")];
+    const usedRows = tableRows.filter(row => {
+      const name = row.querySelector('[name="itemName"]')?.value?.trim();
+      const price = parseMoney(row.querySelector('[name="itemPrice"]')?.value);
+      return name || price;
+    });
+    if (!usedRows.length) {
+      missing.push("Item / transaksi");
+      missing.push("Harga");
+    } else {
+      const invalidRow = usedRows.find(row => {
+        const name = row.querySelector('[name="itemName"]')?.value?.trim();
+        const price = parseMoney(row.querySelector('[name="itemPrice"]')?.value);
+        return !name || price <= 0;
+      });
+      if (invalidRow) missing.push("Item / transaksi dan harga harus terisi di setiap baris yang dipakai");
+    }
+  }
+
+  if (missing.length) {
+    alert(`Mohon lengkapi field wajib:\n- ${[...new Set(missing)].join("\n- ")}`);
+    return false;
+  }
+  return true;
 }
 
 function updateFormTotal(form) {
@@ -878,17 +963,21 @@ function handleSubmit(event) {
   const data = Object.fromEntries(new FormData(form).entries());
   const type = form.dataset.type;
   const items = collectItems(form);
+  if (!validateRequiredForm(form, items)) return;
   if (!items.length) {
     alert("Tambahkan minimal satu rincian item/transaksi.");
     return;
   }
+  const editId = form.dataset.editId;
+  const existingRecord = editId ? state.records.find(item => item.id === editId) : null;
   const record = {
-    id: makeId(),
+    id: existingRecord?.id || makeId(),
     type,
-    register: nextRegister(type, data.date),
-    createdAt: new Date().toISOString(),
-    createdByEmail: currentUser.email || "",
-    createdByRole: currentUser.role || "user",
+    register: existingRecord?.register || nextRegister(type, data.date),
+    createdAt: existingRecord?.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    createdByEmail: existingRecord?.createdByEmail || currentUser.email || "",
+    createdByRole: existingRecord?.createdByRole || currentUser.role || "user",
     items,
     ...data
   };
@@ -906,13 +995,18 @@ function handleSubmit(event) {
   if (type === "PR") {
     record.payee = payeeNameForRecord(record, source);
   }
-  state.records.unshift(record);
+  if (existingRecord) {
+    state.records = state.records.map(item => item.id === existingRecord.id ? record : item);
+  } else {
+    state.records.unshift(record);
+  }
 
   saveState();
   rebuildReferenceForms();
   byId("printArea").innerHTML = "";
   byId("printArea").style.display = "none";
   form.reset();
+  delete form.dataset.editId;
   form.querySelector(".item-table tbody").innerHTML = "";
   addItemRow(form.querySelector(".item-table"));
   showView("records");
@@ -1074,6 +1168,7 @@ function recordCards(records) {
         <div class="record-meta">${escapeHtml(record.subject || record.description || "")}</div>
       </div>
       <div class="record-actions">
+        <button class="ghost edit-record" data-id="${record.id}">Edit</button>
         <button class="ghost preview-record" data-id="${record.id}">Preview</button>
         <button class="secondary print-record" data-id="${record.id}">Print / PDF</button>
       </div>
@@ -1086,6 +1181,46 @@ function renderPrint(id) {
   if (!record) return;
   activePrintId = id;
   byId("printArea").innerHTML = printTemplate(record);
+}
+
+function setElementValue(form, name, value) {
+  if (!form.elements[name]) return;
+  form.elements[name].value = value ?? "";
+}
+
+function populateFormForEdit(record) {
+  const viewId = record.type.toLowerCase();
+  if (!byId(viewId)) return;
+  showView(viewId);
+  const form = byId(viewId).querySelector("form.request-form");
+  if (!form) return;
+  form.dataset.editId = record.id;
+  form.querySelector(".panel-head .mini").textContent = `Mode edit: ${record.register}`;
+  form.querySelector('button[type="submit"]').textContent = "Update Pengajuan";
+
+  if (record.sourceId && form.elements.sourceId && ![...form.elements.sourceId.options].some(option => option.value === record.sourceId)) {
+    const source = state.records.find(item => item.id === record.sourceId);
+    const option = document.createElement("option");
+    option.value = record.sourceId;
+    option.textContent = source ? referenceLabel(source) : record.sourceRegister || "Referensi lama";
+    form.elements.sourceId.appendChild(option);
+  }
+
+  Object.entries(record).forEach(([key, value]) => {
+    if (["items", "ppn", "pph", "exchangeRate"].includes(key)) return;
+    setElementValue(form, key, value);
+  });
+  setElementValue(form, "exchangeRate", record.exchangeRate ? plainNumber(record.exchangeRate) : "1");
+  setElementValue(form, "ppn", record.ppn ? plainNumber(record.ppn) : "");
+  setElementValue(form, "pph", record.pph ? plainNumber(record.pph) : "");
+  applySigners(form);
+
+  const table = form.querySelector(".item-table");
+  table.querySelector("tbody").innerHTML = "";
+  (record.items || []).forEach(item => addItemRow(table, item));
+  if (!record.items?.length) addItemRow(table);
+  updateFormTotal(form);
+  form.scrollIntoView({ behavior: "smooth" });
 }
 
 function metaRow(label, value) {
@@ -1500,6 +1635,12 @@ document.addEventListener("click", event => {
   if (print) {
     renderPrint(print.dataset.id);
     setTimeout(() => window.print(), 50);
+  }
+
+  const editRecord = event.target.closest(".edit-record");
+  if (editRecord) {
+    const record = visibleRecords().find(item => item.id === editRecord.dataset.id);
+    if (record) populateFormForEdit(record);
   }
 
   const picker = event.target.closest(".open-vendor-picker");

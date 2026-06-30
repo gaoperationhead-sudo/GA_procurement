@@ -20,6 +20,10 @@ Jika browser membatasi file lokal, jalankan server lokal dari folder ini dengan 
 - Cash Advance: buat Cash Advance Request, Payment Request bisa dibuat otomatis, lalu buat Cash Advance Completion dari referensi CAR/PR.
 - Payment Request: bisa dibuat manual dari referensi PO, CAR, atau SPK.
 
+## Field Wajib dan Edit
+
+PO, CAR, dan PR memiliki validasi field wajib sebelum bisa disimpan. Jika ada kesalahan input, buka menu `Record`, klik `Edit` pada transaksi terkait, perbaiki data, lalu klik `Update Pengajuan`. Nomor transaksi tetap sama saat diedit.
+
 ## Nomor register
 
 Nomor dibuat otomatis saat data disimpan dengan format:
