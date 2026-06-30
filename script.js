@@ -29,6 +29,7 @@ const FORM_TITLES = {
 };
 const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII"];
 const STORAGE_KEY = "ppp-procurement-system-v1";
+const STORAGE_BACKUP_KEY = "ppp-procurement-system-v1-last-backup";
 
 let state = loadState();
 let activePrintId = null;
@@ -48,6 +49,7 @@ function loadState() {
 }
 
 function saveState() {
+  backupLocalState();
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   renderMonthFilters();
   renderDashboard();
@@ -59,6 +61,15 @@ function saveState() {
       .then(saved => updateCloudStatus(saved ? "Tersimpan online" : "Mode lokal"))
       .catch(() => updateCloudStatus("Cloud gagal menyimpan, data lokal aman"));
   }
+}
+
+function backupLocalState() {
+  const current = localStorage.getItem(STORAGE_KEY);
+  if (!current) return;
+  localStorage.setItem(STORAGE_BACKUP_KEY, JSON.stringify({
+    backedUpAt: new Date().toISOString(),
+    data: JSON.parse(current)
+  }));
 }
 
 function updateCloudStatus(text) {
@@ -74,6 +85,41 @@ function normalizeState(input) {
   };
 }
 
+function mergeById(localItems = [], cloudItems = []) {
+  const merged = new Map();
+  [...cloudItems, ...localItems].forEach(item => {
+    if (!item) return;
+    const id = item.id || `${item.name || item.register || "item"}-${item.createdAt || ""}`;
+    const existing = merged.get(id);
+    if (!existing) {
+      merged.set(id, item);
+      return;
+    }
+    const existingTime = new Date(existing.updatedAt || existing.createdAt || 0).getTime();
+    const itemTime = new Date(item.updatedAt || item.createdAt || 0).getTime();
+    merged.set(id, itemTime >= existingTime ? item : existing);
+  });
+  return [...merged.values()];
+}
+
+function mergeSequence(localSequence = {}, cloudSequence = {}) {
+  const merged = { ...cloudSequence };
+  Object.entries(localSequence).forEach(([key, value]) => {
+    merged[key] = Math.max(Number(merged[key] || 0), Number(value || 0));
+  });
+  return merged;
+}
+
+function mergeStates(localState, cloudState) {
+  const local = normalizeState(localState);
+  const cloud = normalizeState(cloudState);
+  return {
+    records: mergeById(local.records, cloud.records).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)),
+    sequence: mergeSequence(local.sequence, cloud.sequence),
+    vendors: mergeById(local.vendors, cloud.vendors).sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")))
+  };
+}
+
 async function loadCloudState() {
   if (!window.ProcurementCloud?.enabled()) {
     updateCloudStatus("Mode lokal");
@@ -83,9 +129,12 @@ async function loadCloudState() {
   try {
     const cloudState = await window.ProcurementCloud.load();
     if (cloudState) {
-      state = normalizeState(cloudState);
+      const localState = loadState();
+      state = mergeStates(localState, cloudState);
+      backupLocalState();
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      updateCloudStatus("Data online aktif");
+      await window.ProcurementCloud.persist(state);
+      updateCloudStatus("Data lokal dan online digabung");
     } else {
       await window.ProcurementCloud.persist(state);
       updateCloudStatus("Cloud aktif, data lokal diunggah");
