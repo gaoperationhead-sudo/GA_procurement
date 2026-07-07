@@ -8,7 +8,7 @@ window.PROCUREMENT_CLOUD_CONFIG = {
   adminEmails: ['hrdga.puriprimapersada@gmail.com'],
   approverEmails: {
     deptHead: {
-      HRDGA: [ga.operationhead@gmail.com],
+      HRDGA: ['ga.operationhead@gmail.com'],
       'Operasional & network development': [],
       Legal: [],
       'Finance & Accounting': []
