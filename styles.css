@@ -793,18 +793,26 @@ textarea {
   font-size: 10px;
 }
 
-.approve-stamp {
+.approval-stamp {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   margin-top: 18px;
-  border: 2px solid #0f776d;
-  color: #0f776d;
   font-weight: 800;
   font-size: 14px;
   letter-spacing: 0;
   padding: 5px 10px;
   transform: rotate(-8deg);
+}
+
+.approve-stamp {
+  border: 2px solid #0f776d;
+  color: #0f776d;
+}
+
+.rejected-stamp {
+  border: 2px solid #b42318;
+  color: #b42318;
 }
 
 .signature-box .name {

@@ -1479,6 +1479,12 @@ function printFooterBlock() {
 function approvalPrintBlock(record) {
   if (record.type !== "PR") return "";
   const approval = record.approval || createApproval(record);
+  const printStatus = status => {
+    if (status === "approved") return "Approved";
+    if (status === "rejected") return "Rejected";
+    if (status === "revised") return "Revise";
+    return "Pending";
+  };
   return `
     <div class="section-label">Approval Status</div>
     <table class="print-table approval-print-table">
@@ -1495,7 +1501,7 @@ function approvalPrintBlock(record) {
           <tr>
             <td>${escapeHtml(step.label)}</td>
             <td>${escapeHtml(step.name || "")}</td>
-            <td>${escapeHtml(step.status === "approved" ? "Approved" : "Pending")}</td>
+            <td>${escapeHtml(printStatus(step.status))}</td>
             <td>${escapeHtml(step.approvedAt ? formatDate(step.approvedAt) : "-")}</td>
           </tr>
         `).join("")}
@@ -1839,6 +1845,11 @@ function signatureBlock(record) {
   const departmentLabel = departmentPrintLabel(record.department || "");
   const approval = record.type === "PR" ? record.approval || createApproval(record) : null;
   const stepStatus = key => approval?.steps?.find(step => step.key === key)?.status || "";
+  const stampForStatus = status => {
+    if (status === "approved") return `<span class="approval-stamp approve-stamp">APPROVE</span>`;
+    if (status === "rejected") return `<span class="approval-stamp rejected-stamp">REJECTED</span>`;
+    return "";
+  };
   const signatures = [
     ["User yang Mengajukan", record.requestor, record.rank, ""],
     [`Department Head ${departmentLabel}`, record.deptHead || DEPARTMENT_HEADS[record.department] || "", departmentLabel, stepStatus("deptHead")],
@@ -1850,7 +1861,7 @@ function signatureBlock(record) {
     ${signatures.map(([role, name, rank, status]) => `
       <div class="signature-box">
         <div class="role">${escapeHtml(role)}</div>
-        <div>${status === "approved" ? `<span class="approve-stamp">APPROVE</span>` : ""}</div>
+        <div>${stampForStatus(status)}</div>
         <div class="name">${escapeHtml(name || "")}</div>
         <div class="rank">${escapeHtml(rank || "")}</div>
       </div>`).join("")}
