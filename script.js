@@ -29,7 +29,9 @@ const APPROVAL_STATUS_LABELS = {
   pending_deptHead: "Menunggu Department Head",
   pending_finance: "Menunggu Finance",
   pending_generalManager: "Menunggu General Manager",
-  approved: "Approved"
+  approved: "Approved",
+  rejected: "Rejected",
+  revised: "Revise"
 };
 const FORM_TITLES = {
   PO: "Purchase Order",
@@ -228,6 +230,7 @@ function showApp(session) {
   }
   document.body.classList.toggle("is-admin", currentUser.role === "admin");
   document.body.classList.toggle("is-approver", currentUser.role === "approver");
+  if (currentUser.role === "approver") showView("dashboard");
 }
 
 function authIsRequired() {
@@ -430,20 +433,27 @@ function isCurrentPendingApprover(record) {
 function hasApprovedByCurrentUser(record) {
   if (!record?.approval?.steps?.length || !currentUser.email) return false;
   const email = cleanEmail(currentUser.email);
+  return record.approval.steps.some(step => step.status === "approved" && cleanEmail(step.approvedByEmail) === email);
+}
+
+function hasHandledByCurrentUser(record) {
+  if (!record?.approval?.steps?.length || !currentUser.email) return false;
+  const email = cleanEmail(currentUser.email);
   return record.approval.steps.some(step => cleanEmail(step.approvedByEmail) === email);
 }
 
 function canSeeRecord(record) {
   if (isAdmin()) return true;
-  if (record.type === "PR" && (isCurrentPendingApprover(record) || hasApprovedByCurrentUser(record))) return true;
-  if (!currentUser.email) return true;
-  if (!record.createdByEmail) return true;
-  return String(record.createdByEmail || "").toLowerCase() === currentUser.email.toLowerCase();
+  if (record.type === "PR" && (isCurrentPendingApprover(record) || hasHandledByCurrentUser(record))) return true;
+  if (isApprover()) return false;
+  if (!currentUser.email || !record.createdByEmail) return false;
+  return cleanEmail(record.createdByEmail) === cleanEmail(currentUser.email);
 }
 
 function canEditRecord(record) {
   if (isAdmin()) return true;
-  return cleanEmail(record.createdByEmail) === cleanEmail(currentUser.email);
+  const isOwner = cleanEmail(record.createdByEmail) === cleanEmail(currentUser.email);
+  return isOwner && record.type === "PR" && record.approval?.status === "revised";
 }
 
 function visibleRecords() {
@@ -535,7 +545,7 @@ function signerNameForStep(record, key) {
 
 function createApproval(record, existingApproval) {
   if (record.type !== "PR") return null;
-  if (existingApproval?.steps?.length) {
+  if (existingApproval?.steps?.length && existingApproval.status !== "revised") {
     return {
       ...existingApproval,
       steps: APPROVAL_STEPS.map(step => {
@@ -565,6 +575,10 @@ function createApproval(record, existingApproval) {
   };
 }
 
+function resetApprovalForResubmission(record) {
+  return createApproval({ ...record, approval: null }, null);
+}
+
 function approvalLabel(record) {
   if (record.type !== "PR") return "";
   const approval = record.approval || createApproval(record);
@@ -573,6 +587,7 @@ function approvalLabel(record) {
 
 function nextApprovalStep(record) {
   const approval = record.approval || createApproval(record);
+  if (["approved", "rejected", "revised"].includes(approval?.status)) return null;
   return approval?.steps?.find(step => step.status !== "approved") || null;
 }
 
@@ -1112,7 +1127,9 @@ function handleSubmit(event) {
   record.subject = data.subject || data.purpose || data.carType || data.description || FORM_TITLES[type];
   if (type === "PR") {
     record.payee = payeeNameForRecord(record, source);
-    record.approval = createApproval(record, existingRecord?.approval);
+    record.approval = existingRecord?.approval?.status === "revised"
+      ? resetApprovalForResubmission(record)
+      : createApproval(record, existingRecord?.approval);
   }
   if (existingRecord) {
     state.records = state.records.map(item => item.id === existingRecord.id ? record : item);
@@ -1273,7 +1290,7 @@ function renderDashboard() {
   byId("metricPR").textContent = count("PR");
   byId("metricApprovalPending").textContent = pendingApproval;
   byId("metricApprovalDone").textContent = doneApproval;
-  byId("recentRecords").innerHTML = recordCards(dashboardRecords.slice(0, 5));
+  byId("recentRecords").innerHTML = recordCards((isApprover() ? dashboardRecords.filter(record => record.type === "PR") : dashboardRecords).slice(0, 5));
 }
 
 function renderRecords() {
@@ -1290,13 +1307,14 @@ function renderRecords() {
 function approvalSummary(record) {
   if (record.type !== "PR") return "";
   const approval = record.approval || createApproval(record);
+  const badgeClass = approval.status === "approved" ? "done" : approval.status === "rejected" ? "rejected" : approval.status === "revised" ? "revised" : "";
   return `
     <div class="approval-box">
-      <span class="approval-badge ${approval.status === "approved" ? "done" : ""}">${escapeHtml(approvalLabel(record))}</span>
+      <span class="approval-badge ${badgeClass}">${escapeHtml(approvalLabel(record))}</span>
       <div class="approval-steps">
         ${approval.steps.map(step => `
-          <span class="approval-step ${step.status === "approved" ? "done" : ""}">
-            ${escapeHtml(step.label)}: ${escapeHtml(step.status === "approved" ? `Approved ${formatDate(step.approvedAt)} ${step.approvedByEmail ? `oleh ${step.approvedByEmail}` : ""}` : "Pending")}
+          <span class="approval-step ${step.status === "approved" ? "done" : step.status === "rejected" ? "rejected" : step.status === "revised" ? "revised" : ""}">
+            ${escapeHtml(step.label)}: ${escapeHtml(step.status === "approved" ? `Approved ${formatDate(step.approvedAt)} ${step.approvedByEmail ? `oleh ${step.approvedByEmail}` : ""}` : step.status === "rejected" ? `Rejected ${formatDate(step.approvedAt)} ${step.approvedByEmail ? `oleh ${step.approvedByEmail}` : ""}` : step.status === "revised" ? `Revise ${formatDate(step.approvedAt)} ${step.approvedByEmail ? `oleh ${step.approvedByEmail}` : ""}` : "Pending")}
           </span>
         `).join("")}
       </div>
@@ -1307,7 +1325,11 @@ function approvalSummary(record) {
 function approvalAction(record) {
   const step = nextApprovalStep(record);
   if (!canApproveRecord(record) || !step) return "";
-  return `<button class="primary approve-record" data-id="${record.id}" type="button">Setujui ${escapeHtml(step.label)}</button>`;
+  return `
+    <button class="primary approve-record" data-id="${record.id}" type="button">Approve ${escapeHtml(step.label)}</button>
+    <button class="danger reject-record" data-id="${record.id}" type="button">Reject</button>
+    <button class="secondary revise-record" data-id="${record.id}" type="button">Revise</button>
+  `;
 }
 
 function recordCards(records) {
@@ -1347,6 +1369,27 @@ function approveRecord(id) {
   step.approvedByEmail = currentUser.email || "administrator";
   const upcoming = nextApprovalStep(record);
   record.approval.status = upcoming ? `pending_${upcoming.key}` : "approved";
+  record.updatedAt = new Date().toISOString();
+  saveState();
+}
+
+function setApprovalDecision(id, decision) {
+  const record = state.records.find(item => item.id === id);
+  if (!record || record.type !== "PR") return;
+  record.approval = createApproval(record, record.approval);
+  const step = nextApprovalStep(record);
+  if (!step || !canApproveRecord(record)) {
+    alert("Dokumen ini belum berada pada tahap approval akun Anda.");
+    return;
+  }
+  const label = decision === "rejected" ? "reject" : "revise";
+  if (!confirm(`Yakin ingin ${label} pengajuan ini?`)) return;
+  step.status = decision;
+  step.approvedAt = new Date().toISOString();
+  step.approvedByEmail = currentUser.email || "administrator";
+  record.approval.status = decision;
+  record.approval.decisionAt = new Date().toISOString();
+  record.approval.decisionByEmail = currentUser.email || "administrator";
   record.updatedAt = new Date().toISOString();
   saveState();
 }
@@ -1848,10 +1891,21 @@ document.addEventListener("click", event => {
     approveRecord(approve.dataset.id);
   }
 
+  const reject = event.target.closest(".reject-record");
+  if (reject) {
+    setApprovalDecision(reject.dataset.id, "rejected");
+  }
+
+  const revise = event.target.closest(".revise-record");
+  if (revise) {
+    setApprovalDecision(revise.dataset.id, "revised");
+  }
+
   const editRecord = event.target.closest(".edit-record");
   if (editRecord) {
     const record = visibleRecords().find(item => item.id === editRecord.dataset.id);
-    if (record) populateFormForEdit(record);
+    if (record && canEditRecord(record)) populateFormForEdit(record);
+    else alert("Dokumen hanya bisa diedit jika status pengajuan sudah Revise.");
   }
 
   const picker = event.target.closest(".open-vendor-picker");

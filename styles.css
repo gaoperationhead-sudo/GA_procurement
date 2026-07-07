@@ -26,6 +26,11 @@ body:not(.is-admin) .admin-only {
   display: none !important;
 }
 
+body.is-approver nav .nav-button:not([data-view="dashboard"]):not([data-view="records"]),
+body.is-approver .dashboard-standard {
+  display: none !important;
+}
+
 .login-screen {
   position: relative;
   min-height: 100vh;
@@ -484,6 +489,20 @@ textarea {
   border-color: #b8dfd7;
   background: #e8f6f3;
   color: #0f776d;
+}
+
+.approval-badge.rejected,
+.approval-step.rejected {
+  border-color: #f1b8b4;
+  background: #fff0ef;
+  color: #b42318;
+}
+
+.approval-badge.revised,
+.approval-step.revised {
+  border-color: #f5d29c;
+  background: #fff7e8;
+  color: #b54708;
 }
 
 .approval-steps {
