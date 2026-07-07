@@ -1274,6 +1274,9 @@ function renderDashboard() {
   const month = byId("dashboardMonth")?.value || "ALL";
   const dashboardRecords = filterByMonth(visibleRecords(), month);
   const count = type => dashboardRecords.filter(record => record.type === type).length;
+  const prPaymentTotal = dashboardRecords
+    .filter(record => record.type === "PR")
+    .reduce((sum, record) => sum + Number(record.total || 0), 0);
   const approvalRecords = filterByMonth(state.records.filter(record => record.type === "PR"), month);
   const pendingApproval = approvalRecords.filter(record => {
     const step = nextApprovalStep(record);
@@ -1288,6 +1291,7 @@ function renderDashboard() {
   byId("metricPO").textContent = count("PO");
   byId("metricCAR").textContent = count("CAR");
   byId("metricPR").textContent = count("PR");
+  byId("metricPRTotal").textContent = formatCurrencyValue(prPaymentTotal, "IDR");
   byId("metricApprovalPending").textContent = pendingApproval;
   byId("metricApprovalDone").textContent = doneApproval;
   byId("recentRecords").innerHTML = recordCards((isApprover() ? dashboardRecords.filter(record => record.type === "PR") : dashboardRecords).slice(0, 5));
