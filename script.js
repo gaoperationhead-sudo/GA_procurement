@@ -20,6 +20,17 @@ const FIXED_SIGNERS = {
   generalManager: "Marchyandi Rayi",
   director: "Henry Tjahjadi"
 };
+const APPROVAL_STEPS = [
+  { key: "deptHead", label: "Department Head" },
+  { key: "finance", label: "Finance" },
+  { key: "generalManager", label: "General Manager" }
+];
+const APPROVAL_STATUS_LABELS = {
+  pending_deptHead: "Menunggu Department Head",
+  pending_finance: "Menunggu Finance",
+  pending_generalManager: "Menunggu General Manager",
+  approved: "Approved"
+};
 const FORM_TITLES = {
   PO: "Purchase Order",
   SPK: "Surat Perintah Kerja",
@@ -212,10 +223,11 @@ function showApp(session) {
     role: window.ProcurementCloud?.roleForSession?.(session) || (user ? "user" : "admin")
   };
   if (byId("adminUser")) {
-    const label = currentUser.role === "admin" ? "Administrator" : "User";
+    const label = currentUser.role === "admin" ? "Administrator" : currentUser.role === "approver" ? "Approver" : "User";
     byId("adminUser").textContent = user ? `${label}: ${user}` : "";
   }
   document.body.classList.toggle("is-admin", currentUser.role === "admin");
+  document.body.classList.toggle("is-approver", currentUser.role === "approver");
 }
 
 function authIsRequired() {
@@ -263,6 +275,7 @@ function handleLogout() {
   cloudReady = false;
   currentUser = { email: "", role: "guest" };
   document.body.classList.remove("is-admin");
+  document.body.classList.remove("is-approver");
   showLogin();
   updateCloudStatus("Silakan login");
 }
@@ -377,11 +390,60 @@ function isAdmin() {
   return currentUser.role === "admin";
 }
 
+function isApprover() {
+  return currentUser.role === "approver";
+}
+
+function cleanEmail(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function approverConfig() {
+  return window.PROCUREMENT_CLOUD_CONFIG?.approverEmails || {};
+}
+
+function approvalEmailsFor(record, key) {
+  const config = approverConfig();
+  if (key === "deptHead") {
+    const deptEmails = config.deptHead || {};
+    const list = Array.isArray(deptEmails) ? deptEmails : deptEmails[record.department] || [];
+    return list.map(cleanEmail).filter(Boolean);
+  }
+  return (config[key] || []).map(cleanEmail).filter(Boolean);
+}
+
+function currentEmailMatches(list) {
+  const email = cleanEmail(currentUser.email);
+  return Boolean(email && list.includes(email));
+}
+
+function isCurrentApproverForStep(record, stepKey) {
+  if (!record || record.type !== "PR") return false;
+  return currentEmailMatches(approvalEmailsFor(record, stepKey));
+}
+
+function isCurrentPendingApprover(record) {
+  const step = nextApprovalStep(record);
+  return Boolean(step && isCurrentApproverForStep(record, step.key));
+}
+
+function hasApprovedByCurrentUser(record) {
+  if (!record?.approval?.steps?.length || !currentUser.email) return false;
+  const email = cleanEmail(currentUser.email);
+  return record.approval.steps.some(step => cleanEmail(step.approvedByEmail) === email);
+}
+
 function canSeeRecord(record) {
   if (isAdmin()) return true;
+  if (record.type === "PR" && (isCurrentPendingApprover(record) || hasApprovedByCurrentUser(record))) return true;
   if (!currentUser.email) return true;
   if (!record.createdByEmail) return true;
   return String(record.createdByEmail || "").toLowerCase() === currentUser.email.toLowerCase();
+}
+
+function canEditRecord(record) {
+  if (isAdmin()) return true;
+  return cleanEmail(record.createdByEmail) === cleanEmail(currentUser.email);
 }
 
 function visibleRecords() {
@@ -462,6 +524,62 @@ function settlementFromItems(items) {
   if (summary.payment > summary.realization) return "Kelebihan";
   if (summary.payment < summary.realization) return "Kekurangan";
   return "Sesuai";
+}
+
+function signerNameForStep(record, key) {
+  if (key === "deptHead") return record.deptHead || DEPARTMENT_HEADS[record.department] || "";
+  if (key === "finance") return record.finance || FIXED_SIGNERS.finance;
+  if (key === "generalManager") return record.generalManager || FIXED_SIGNERS.generalManager;
+  return "";
+}
+
+function createApproval(record, existingApproval) {
+  if (record.type !== "PR") return null;
+  if (existingApproval?.steps?.length) {
+    return {
+      ...existingApproval,
+      steps: APPROVAL_STEPS.map(step => {
+        const existingStep = existingApproval.steps.find(item => item.key === step.key) || {};
+        return {
+          key: step.key,
+          label: step.label,
+          name: signerNameForStep(record, step.key),
+          status: existingStep.status || "pending",
+          approvedAt: existingStep.approvedAt || "",
+          approvedByEmail: existingStep.approvedByEmail || ""
+        };
+      }),
+      status: existingApproval.status || "pending_deptHead"
+    };
+  }
+  return {
+    status: "pending_deptHead",
+    steps: APPROVAL_STEPS.map(step => ({
+      key: step.key,
+      label: step.label,
+      name: signerNameForStep(record, step.key),
+      status: "pending",
+      approvedAt: "",
+      approvedByEmail: ""
+    }))
+  };
+}
+
+function approvalLabel(record) {
+  if (record.type !== "PR") return "";
+  const approval = record.approval || createApproval(record);
+  return APPROVAL_STATUS_LABELS[approval.status] || "Menunggu Approval";
+}
+
+function nextApprovalStep(record) {
+  const approval = record.approval || createApproval(record);
+  return approval?.steps?.find(step => step.status !== "approved") || null;
+}
+
+function canApproveRecord(record) {
+  const step = nextApprovalStep(record);
+  if (!record || record.type !== "PR" || !step) return false;
+  return isAdmin() || isCurrentApproverForStep(record, step.key);
 }
 
 function shortageAmountFromCompletion(record) {
@@ -994,6 +1112,7 @@ function handleSubmit(event) {
   record.subject = data.subject || data.purpose || data.carType || data.description || FORM_TITLES[type];
   if (type === "PR") {
     record.payee = payeeNameForRecord(record, source);
+    record.approval = createApproval(record, existingRecord?.approval);
   }
   if (existingRecord) {
     state.records = state.records.map(item => item.id === existingRecord.id ? record : item);
@@ -1138,10 +1257,22 @@ function renderDashboard() {
   const month = byId("dashboardMonth")?.value || "ALL";
   const dashboardRecords = filterByMonth(visibleRecords(), month);
   const count = type => dashboardRecords.filter(record => record.type === type).length;
+  const approvalRecords = filterByMonth(state.records.filter(record => record.type === "PR"), month);
+  const pendingApproval = approvalRecords.filter(record => {
+    const step = nextApprovalStep(record);
+    if (!step) return false;
+    return isAdmin() || isCurrentApproverForStep(record, step.key);
+  }).length;
+  const doneApproval = approvalRecords.filter(record => {
+    if (isAdmin()) return record.approval?.status === "approved";
+    return hasApprovedByCurrentUser(record);
+  }).length;
   byId("metricTotal").textContent = dashboardRecords.length;
   byId("metricPO").textContent = count("PO");
   byId("metricCAR").textContent = count("CAR");
   byId("metricPR").textContent = count("PR");
+  byId("metricApprovalPending").textContent = pendingApproval;
+  byId("metricApprovalDone").textContent = doneApproval;
   byId("recentRecords").innerHTML = recordCards(dashboardRecords.slice(0, 5));
 }
 
@@ -1156,6 +1287,29 @@ function renderRecords() {
   byId("allRecords").innerHTML = recordCards(records);
 }
 
+function approvalSummary(record) {
+  if (record.type !== "PR") return "";
+  const approval = record.approval || createApproval(record);
+  return `
+    <div class="approval-box">
+      <span class="approval-badge ${approval.status === "approved" ? "done" : ""}">${escapeHtml(approvalLabel(record))}</span>
+      <div class="approval-steps">
+        ${approval.steps.map(step => `
+          <span class="approval-step ${step.status === "approved" ? "done" : ""}">
+            ${escapeHtml(step.label)}: ${escapeHtml(step.status === "approved" ? `Approved ${formatDate(step.approvedAt)} ${step.approvedByEmail ? `oleh ${step.approvedByEmail}` : ""}` : "Pending")}
+          </span>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function approvalAction(record) {
+  const step = nextApprovalStep(record);
+  if (!canApproveRecord(record) || !step) return "";
+  return `<button class="primary approve-record" data-id="${record.id}" type="button">Setujui ${escapeHtml(step.label)}</button>`;
+}
+
 function recordCards(records) {
   if (!records.length) return `<div class="empty">Belum ada record.</div>`;
   return records.map(record => `
@@ -1166,14 +1320,35 @@ function recordCards(records) {
         ${isAdmin() && record.createdByEmail ? `<div class="record-meta">Dibuat oleh: ${escapeHtml(record.createdByEmail)}</div>` : ""}
         ${isAdmin() && !record.createdByEmail ? `<div class="record-meta">Data lama: belum ada pemilik user</div>` : ""}
         <div class="record-meta">${escapeHtml(record.subject || record.description || "")}</div>
+        ${approvalSummary(record)}
       </div>
       <div class="record-actions">
-        <button class="ghost edit-record" data-id="${record.id}">Edit</button>
+        ${approvalAction(record)}
+        ${canEditRecord(record) ? `<button class="ghost edit-record" data-id="${record.id}">Edit</button>` : ""}
         <button class="ghost preview-record" data-id="${record.id}">Preview</button>
         <button class="secondary print-record" data-id="${record.id}">Print / PDF</button>
       </div>
     </article>
   `).join("");
+}
+
+function approveRecord(id) {
+  const record = state.records.find(item => item.id === id);
+  if (!record || record.type !== "PR") return;
+  record.approval = createApproval(record, record.approval);
+  const step = nextApprovalStep(record);
+  if (!step) return;
+  if (!canApproveRecord(record)) {
+    alert("Dokumen ini belum berada pada tahap approval akun Anda.");
+    return;
+  }
+  step.status = "approved";
+  step.approvedAt = new Date().toISOString();
+  step.approvedByEmail = currentUser.email || "administrator";
+  const upcoming = nextApprovalStep(record);
+  record.approval.status = upcoming ? `pending_${upcoming.key}` : "approved";
+  record.updatedAt = new Date().toISOString();
+  saveState();
 }
 
 function renderPrint(id) {
@@ -1255,6 +1430,34 @@ function printFooterBlock() {
       SEQUIS TOWER Lt. 6, Jalan Jendral Sudirman Kav. 71, Jakarta<br>
       Phone: (021) 2524073 | Email: puriprimapersada@gmail.com
     </div>
+  `;
+}
+
+function approvalPrintBlock(record) {
+  if (record.type !== "PR") return "";
+  const approval = record.approval || createApproval(record);
+  return `
+    <div class="section-label">Approval Status</div>
+    <table class="print-table approval-print-table">
+      <thead>
+        <tr>
+          <th>Tahap</th>
+          <th>Nama</th>
+          <th>Status</th>
+          <th>Tanggal</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${approval.steps.map(step => `
+          <tr>
+            <td>${escapeHtml(step.label)}</td>
+            <td>${escapeHtml(step.name || "")}</td>
+            <td>${escapeHtml(step.status === "approved" ? "Approved" : "Pending")}</td>
+            <td>${escapeHtml(step.approvedAt ? formatDate(step.approvedAt) : "-")}</td>
+          </tr>
+        `).join("")}
+      </tbody>
+    </table>
   `;
 }
 
@@ -1362,6 +1565,7 @@ function prPrintTemplate(record) {
       </div>
       ${prPaymentTable(record)}
       ${taxLines(record, tax)}
+      ${approvalPrintBlock(record)}
       ${signatureBlock(record)}
       ${printFooterBlock()}
     </div>
@@ -1590,18 +1794,20 @@ function taxLines(record, tax) {
 
 function signatureBlock(record) {
   const departmentLabel = departmentPrintLabel(record.department || "");
+  const approval = record.type === "PR" ? record.approval || createApproval(record) : null;
+  const stepStatus = key => approval?.steps?.find(step => step.key === key)?.status || "";
   const signatures = [
-    ["User yang Mengajukan", record.requestor, record.rank],
-    [`Department Head ${departmentLabel}`, record.deptHead || DEPARTMENT_HEADS[record.department] || "", departmentLabel],
-    ["Finance", record.finance || FIXED_SIGNERS.finance, "Finance"],
-    ["General Manager", record.generalManager, "General Manager"],
-    ["Direksi", record.director, "Direksi"]
+    ["User yang Mengajukan", record.requestor, record.rank, ""],
+    [`Department Head ${departmentLabel}`, record.deptHead || DEPARTMENT_HEADS[record.department] || "", departmentLabel, stepStatus("deptHead")],
+    ["Finance", record.finance || FIXED_SIGNERS.finance, "Finance", stepStatus("finance")],
+    ["General Manager", record.generalManager, "General Manager", stepStatus("generalManager")],
+    ["Direksi", record.director, "Direksi", ""]
   ];
   return `<div class="signature-grid">
-    ${signatures.map(([role, name, rank]) => `
+    ${signatures.map(([role, name, rank, status]) => `
       <div class="signature-box">
         <div class="role">${escapeHtml(role)}</div>
-        <div></div>
+        <div>${status === "approved" ? `<span class="approve-stamp">APPROVE</span>` : ""}</div>
         <div class="name">${escapeHtml(name || "")}</div>
         <div class="rank">${escapeHtml(rank || "")}</div>
       </div>`).join("")}
@@ -1635,6 +1841,11 @@ document.addEventListener("click", event => {
   if (print) {
     renderPrint(print.dataset.id);
     setTimeout(() => window.print(), 50);
+  }
+
+  const approve = event.target.closest(".approve-record");
+  if (approve) {
+    approveRecord(approve.dataset.id);
   }
 
   const editRecord = event.target.closest(".edit-record");

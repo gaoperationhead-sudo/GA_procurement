@@ -35,8 +35,25 @@
     return list.includes(String(email || "").toLowerCase());
   }
 
+  function approverLists() {
+    const approvers = config.approverEmails || {};
+    const deptHead = approvers.deptHead || {};
+    return [
+      ...Object.values(deptHead).flat(),
+      ...(approvers.finance || []),
+      ...(approvers.generalManager || [])
+    ].map(item => String(item).toLowerCase()).filter(Boolean);
+  }
+
+  function isApproverEmail(email) {
+    return approverLists().includes(String(email || "").toLowerCase());
+  }
+
   function roleForSession(session) {
-    return isAdminEmail(session?.user?.email) ? "admin" : "user";
+    const email = session?.user?.email;
+    if (isAdminEmail(email)) return "admin";
+    if (isApproverEmail(email)) return "approver";
+    return "user";
   }
 
   function authRequired() {
@@ -129,5 +146,5 @@
     });
   }
 
-  window.ProcurementCloud = { enabled, authRequired, getSession, isAdminEmail, roleForSession, signIn, signOut, updatePassword, load, save, persist };
+  window.ProcurementCloud = { enabled, authRequired, getSession, isAdminEmail, isApproverEmail, roleForSession, signIn, signOut, updatePassword, load, save, persist };
 })();
