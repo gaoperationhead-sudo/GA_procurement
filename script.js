@@ -1398,11 +1398,23 @@ function setApprovalDecision(id, decision) {
   saveState();
 }
 
-function renderPrint(id) {
+function renderPrint(id, targetId = "printArea") {
   const record = visibleRecords().find(item => item.id === id);
   if (!record) return;
   activePrintId = id;
-  byId("printArea").innerHTML = printTemplate(record);
+  byId(targetId).innerHTML = printTemplate(record);
+}
+
+function openPreviewModal(id) {
+  renderPrint(id, "previewContent");
+  byId("previewModal").classList.add("open");
+  byId("previewModal").setAttribute("aria-hidden", "false");
+}
+
+function closePreviewModal() {
+  byId("previewModal").classList.remove("open");
+  byId("previewModal").setAttribute("aria-hidden", "true");
+  byId("previewContent").innerHTML = "";
 }
 
 function setElementValue(form, name, value) {
@@ -1890,9 +1902,7 @@ document.addEventListener("click", event => {
 
   const preview = event.target.closest(".preview-record");
   if (preview) {
-    renderPrint(preview.dataset.id);
-    byId("printArea").style.display = "block";
-    byId("printArea").scrollIntoView({ behavior: "smooth" });
+    openPreviewModal(preview.dataset.id);
   }
 
   const print = event.target.closest(".print-record");
@@ -1962,6 +1972,18 @@ document.addEventListener("click", event => {
     event.preventDefault();
     closePasswordModal();
   }
+
+  const closePreview = event.target.closest("#closePreviewModal");
+  if (closePreview) {
+    event.preventDefault();
+    closePreviewModal();
+  }
+
+  const printPreview = event.target.closest("#printPreviewModal");
+  if (printPreview && activePrintId) {
+    renderPrint(activePrintId);
+    setTimeout(() => window.print(), 50);
+  }
 });
 
 byId("recordFilter").addEventListener("change", renderRecords);
@@ -1982,6 +2004,9 @@ byId("closePasswordModal")?.addEventListener("click", closePasswordModal);
 byId("passwordForm")?.addEventListener("submit", handlePasswordChange);
 byId("passwordModal")?.addEventListener("click", event => {
   if (event.target.id === "passwordModal") closePasswordModal();
+});
+byId("previewModal")?.addEventListener("click", event => {
+  if (event.target.id === "previewModal") closePreviewModal();
 });
 
 byId("exportData").addEventListener("click", () => {

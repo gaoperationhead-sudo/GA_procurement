@@ -216,8 +216,21 @@
     </form>
   </div>
 
-  <script src="cloud-config.js?v=20260707-pr-total"></script>
-  <script src="cloud-store.js?v=20260707-pr-total"></script>
-  <script src="script.js?v=20260707-pr-total"></script>
+  <div id="previewModal" class="modal no-print" aria-hidden="true">
+    <div class="modal-card preview-modal-card">
+      <div class="panel-head preview-modal-head">
+        <h2>Preview Dokumen</h2>
+        <div class="record-actions">
+          <button id="printPreviewModal" class="secondary" type="button">Print / PDF</button>
+          <button id="closePreviewModal" class="ghost" type="button">Tutup</button>
+        </div>
+      </div>
+      <div id="previewContent" class="preview-content"></div>
+    </div>
+  </div>
+
+  <script src="cloud-config.js?v=20260708-preview-modal"></script>
+  <script src="cloud-store.js?v=20260708-preview-modal"></script>
+  <script src="script.js?v=20260708-preview-modal"></script>
 </body>
 </html>
