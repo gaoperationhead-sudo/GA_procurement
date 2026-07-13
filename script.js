@@ -472,6 +472,7 @@ function exportableState() {
 function renderMonthFilters() {
   const dashboardMonth = byId("dashboardMonth");
   const recordMonth = byId("recordMonth");
+  const recordLocation = byId("recordLocation");
   if (dashboardMonth) {
     const selected = dashboardMonth.value || "ALL";
     dashboardMonth.innerHTML = monthOptions(selected);
@@ -481,6 +482,11 @@ function renderMonthFilters() {
     const selected = recordMonth.value || "ALL";
     recordMonth.innerHTML = monthOptions(selected);
     recordMonth.value = [...recordMonth.options].some(option => option.value === selected) ? selected : "ALL";
+  }
+  if (recordLocation) {
+    const selected = recordLocation.value || "ALL";
+    recordLocation.innerHTML = `<option value="ALL">Semua Lokasi</option>${LOCATIONS.map(location => `<option value="${escapeHtml(location)}">${escapeHtml(location)}</option>`).join("")}`;
+    recordLocation.value = [...recordLocation.options].some(option => option.value === selected) ? selected : "ALL";
   }
 }
 
@@ -1301,10 +1307,12 @@ function renderRecords() {
   const filter = byId("recordFilter")?.value || "ALL";
   const selectedMonth = byId("recordMonth")?.value || "ALL";
   const selectedDepartment = byId("recordDepartment")?.value || "ALL";
+  const selectedLocation = byId("recordLocation")?.value || "ALL";
   const baseRecords = visibleRecords();
   const byForm = filter === "ALL" ? baseRecords : baseRecords.filter(record => record.type === filter);
   const byDepartment = selectedDepartment === "ALL" ? byForm : byForm.filter(record => record.department === selectedDepartment);
-  const records = filterByMonth(byDepartment, selectedMonth);
+  const byLocation = selectedLocation === "ALL" ? byDepartment : byDepartment.filter(record => record.location === selectedLocation);
+  const records = filterByMonth(byLocation, selectedMonth);
   byId("allRecords").innerHTML = recordCards(records);
 }
 
@@ -1415,6 +1423,14 @@ function closePreviewModal() {
   byId("previewModal").classList.remove("open");
   byId("previewModal").setAttribute("aria-hidden", "true");
   byId("previewContent").innerHTML = "";
+}
+
+function printRecord(id) {
+  renderPrint(id);
+  byId("printArea").style.display = "block";
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => window.print());
+  });
 }
 
 function setElementValue(form, name, value) {
@@ -1907,8 +1923,7 @@ document.addEventListener("click", event => {
 
   const print = event.target.closest(".print-record");
   if (print) {
-    renderPrint(print.dataset.id);
-    setTimeout(() => window.print(), 50);
+    printRecord(print.dataset.id);
   }
 
   const approve = event.target.closest(".approve-record");
@@ -1981,14 +1996,14 @@ document.addEventListener("click", event => {
 
   const printPreview = event.target.closest("#printPreviewModal");
   if (printPreview && activePrintId) {
-    renderPrint(activePrintId);
-    setTimeout(() => window.print(), 50);
+    printRecord(activePrintId);
   }
 });
 
 byId("recordFilter").addEventListener("change", renderRecords);
 byId("recordMonth").addEventListener("change", renderRecords);
 byId("recordDepartment").addEventListener("change", renderRecords);
+byId("recordLocation").addEventListener("change", renderRecords);
 byId("dashboardMonth").addEventListener("change", renderDashboard);
 byId("vendorForm").addEventListener("submit", handleVendorSubmit);
 byId("vendorListSearch").addEventListener("input", renderVendors);
@@ -2007,6 +2022,11 @@ byId("passwordModal")?.addEventListener("click", event => {
 });
 byId("previewModal")?.addEventListener("click", event => {
   if (event.target.id === "previewModal") closePreviewModal();
+});
+
+window.addEventListener("afterprint", () => {
+  byId("printArea").innerHTML = "";
+  byId("printArea").style.display = "none";
 });
 
 byId("exportData").addEventListener("click", () => {
