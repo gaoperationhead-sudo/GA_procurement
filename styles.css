@@ -104,6 +104,7 @@ button, input, select, textarea {
 button {
   border: 0;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 .app-shell {
@@ -244,7 +245,7 @@ h1 {
 
 .view {
   display: none;
-  padding: 24px 28px;
+  padding: 18px 20px;
 }
 
 .view.active {
@@ -253,16 +254,16 @@ h1 {
 
 .metric-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(130px, 1fr));
-  gap: 14px;
-  margin-bottom: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
 }
 
 .metric {
   background: #fff;
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 16px;
+  padding: 12px;
 }
 
 .metric span {
@@ -273,24 +274,25 @@ h1 {
 
 .metric strong {
   display: block;
-  font-size: 30px;
-  margin-top: 8px;
+  font-size: 26px;
+  margin-top: 5px;
 }
 
 .panel {
   background: #fff;
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 18px;
-  margin-bottom: 18px;
+  padding: 14px;
+  margin-bottom: 14px;
 }
 
 .panel-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
-  margin-bottom: 16px;
+  gap: 10px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
 }
 
 .panel-head.compact-filter {
@@ -303,14 +305,14 @@ h1 {
 
 .flow-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
 }
 
 .flow-grid div {
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 14px;
+  padding: 11px;
 }
 
 .flow-grid b,
@@ -327,8 +329,8 @@ h1 {
 
 .form-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(180px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 10px;
 }
 
 .field {
@@ -353,7 +355,7 @@ h1 {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 10px 11px;
+  padding: 9px 10px;
   background: #fff;
   color: var(--ink);
 }
@@ -373,7 +375,7 @@ h1 {
 }
 
 textarea {
-  min-height: 82px;
+  min-height: 70px;
   resize: vertical;
 }
 
@@ -395,7 +397,7 @@ textarea {
 .record-table th,
 .record-table td {
   border-bottom: 1px solid var(--line);
-  padding: 8px;
+  padding: 6px;
   text-align: left;
   vertical-align: top;
 }
@@ -426,35 +428,37 @@ textarea {
 .form-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 9px;
-  margin-top: 16px;
+  gap: 8px;
+  margin-top: 12px;
+  flex-wrap: wrap;
 }
 
 .record-list {
   display: grid;
-  gap: 9px;
+  gap: 8px;
 }
 
 .record-card {
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: 12px;
+  gap: 10px;
   align-items: center;
   border: 1px solid var(--line);
   border-radius: 6px;
-  padding: 12px;
+  padding: 10px 12px;
   background: #fff;
 }
 
 .record-card strong {
   display: block;
-  font-size: 15px;
+  font-size: 14px;
 }
 
 .record-meta {
   color: var(--muted);
-  font-size: 13px;
-  margin-top: 4px;
+  font-size: 12px;
+  margin-top: 3px;
+  line-height: 1.35;
 }
 
 .record-actions {
@@ -466,8 +470,8 @@ textarea {
 
 .approval-box {
   display: grid;
-  gap: 6px;
-  margin-top: 8px;
+  gap: 5px;
+  margin-top: 6px;
 }
 
 .approval-badge,
@@ -481,7 +485,7 @@ textarea {
   color: #243647;
   font-size: 12px;
   font-weight: 700;
-  padding: 5px 8px;
+  padding: 4px 7px;
 }
 
 .approval-badge.done,
@@ -865,18 +869,191 @@ textarea {
 
   .sidebar {
     position: static;
+    padding: 10px;
   }
 
-  nav,
-  .metric-grid,
-  .flow-grid,
-  .form-grid {
-    grid-template-columns: 1fr;
+  .brand {
+    padding-bottom: 8px;
+    margin-bottom: 8px;
+  }
+
+  .brand img {
+    width: 42px;
+    height: 42px;
+  }
+
+  nav {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+    gap: 6px;
+  }
+
+  .nav-button {
+    padding: 9px 10px;
+    font-size: 14px;
   }
 
   .topbar {
     align-items: flex-start;
     flex-direction: column;
+    padding: 14px;
+    gap: 10px;
+  }
+
+  .topbar h1 {
+    font-size: 22px;
+  }
+
+  .top-actions {
+    width: 100%;
+    justify-content: flex-start;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .view {
+    padding: 12px;
+  }
+
+  .record-card {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .record-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .record-actions button,
+  .form-actions button,
+  .top-actions button,
+  .top-actions .file-button {
+    padding: 8px 10px;
+    font-size: 14px;
+  }
+
+  .filter-row,
+  .panel-head.compact-filter {
+    width: 100%;
+  }
+
+  .filter-row select,
+  .panel-head select,
+  .list-search {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .preview-modal-card {
+    width: min(96vw, 1040px);
+    padding: 10px;
+  }
+
+  .preview-content {
+    overflow-x: auto;
+  }
+}
+
+@media (max-width: 640px) {
+  body {
+    font-size: 14px;
+  }
+
+  .sidebar {
+    padding: 8px;
+  }
+
+  .brand strong {
+    font-size: 15px;
+  }
+
+  .brand span {
+    font-size: 12px;
+  }
+
+  nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .nav-button {
+    min-height: 38px;
+    padding: 8px;
+    font-size: 13px;
+  }
+
+  .topbar h1 {
+    font-size: 19px;
+  }
+
+  .topbar p,
+  .cloud-status {
+    font-size: 12px;
+  }
+
+  .metric-grid,
+  .form-grid,
+  .flow-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .metric,
+  .panel,
+  .record-card {
+    border-radius: 6px;
+  }
+
+  .metric strong {
+    font-size: 24px;
+  }
+
+  .panel {
+    padding: 11px;
+  }
+
+  .panel-head h2 {
+    font-size: 16px;
+  }
+
+  .record-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .record-actions button {
+    width: 100%;
+    white-space: normal;
+  }
+
+  .approval-steps {
+    gap: 5px;
+  }
+
+  .approval-badge,
+  .approval-step {
+    max-width: 100%;
+    font-size: 11px;
+    line-height: 1.25;
+    white-space: normal;
+  }
+
+  .entry-table {
+    min-width: 620px;
+  }
+
+  .preview-modal-head {
+    align-items: flex-start;
+  }
+
+  .preview-modal-head .record-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .preview-content .print-sheet {
+    transform: scale(.62);
+    transform-origin: top left;
+    margin-right: -80mm;
+    margin-bottom: -110mm;
   }
 }
 
@@ -904,6 +1081,10 @@ textarea {
 
   .print-area {
     display: block;
+    position: static;
+    width: 210mm;
+    margin: 0;
+    padding: 0;
   }
 
   .print-sheet {
