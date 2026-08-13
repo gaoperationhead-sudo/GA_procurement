@@ -542,6 +542,11 @@ function settlementFromItems(items) {
   return "Sesuai";
 }
 
+function paymentRequestAmount(item) {
+  if (item.payment) return Number(item.payment || 0);
+  return Number(item.price || 0) * Number(item.qty || 1);
+}
+
 function signerNameForStep(record, key) {
   if (key === "deptHead") return record.deptHead || DEPARTMENT_HEADS[record.department] || "";
   if (key === "finance") return record.finance || FIXED_SIGNERS.finance;
@@ -1091,7 +1096,10 @@ function fillFromReference(form, sourceId) {
     });
     form.elements.description.value = `Pembayaran kekurangan realisasi ${source.sourceRegister || source.register}`;
   } else {
-    source.items.forEach(item => addItemRow(table, item));
+    source.items.forEach(item => addItemRow(table, form.dataset.type === "CAC" && source.type === "PR" ? {
+      ...item,
+      payment: paymentRequestAmount(item)
+    } : item));
   }
   updateFormTotal(form);
 }
