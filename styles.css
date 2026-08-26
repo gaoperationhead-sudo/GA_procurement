@@ -719,6 +719,72 @@ textarea {
   background: #f5f5f5;
 }
 
+.sppd-sheet {
+  padding: 0 0 10mm;
+  font-size: 12px;
+}
+
+.sppd-top {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  gap: 16px;
+  align-items: start;
+  padding: 6mm 10mm 3mm;
+}
+
+.sppd-title-band {
+  background: #990000;
+  color: #fff;
+  text-align: center;
+  font-weight: 700;
+  font-size: 16px;
+  line-height: 1.45;
+  padding: 7px;
+}
+
+.sppd-info-table {
+  width: calc(100% - 20mm);
+  margin: 6mm 10mm 0;
+}
+
+.sppd-info-table td:first-child {
+  width: 260px;
+}
+
+.sppd-intro {
+  margin: 18mm 10mm 5mm;
+}
+
+.sppd-cost-table,
+.sppd-total-table {
+  width: calc(100% - 20mm);
+  margin: 0 10mm;
+}
+
+.sppd-cost-table th {
+  background: #990000;
+  color: #fff;
+}
+
+.sppd-total-table {
+  margin-top: 0;
+}
+
+.sppd-total-table td {
+  font-weight: 700;
+}
+
+.sppd-red-row td {
+  background: #990000;
+  color: #fff;
+}
+
+.sppd-sheet .signature-grid,
+.sppd-sheet .print-footer {
+  margin-left: 10mm;
+  margin-right: 10mm;
+}
+
 .pr-heading {
   border-bottom: 2px solid #222;
   padding-bottom: 10px;

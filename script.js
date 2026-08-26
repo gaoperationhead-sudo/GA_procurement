@@ -37,6 +37,7 @@ const FORM_TITLES = {
   PO: "Purchase Order",
   SPK: "Surat Perintah Kerja",
   CAR: "Cash Advance Request",
+  SPPD: "Surat Perintah Perjalanan Dinas",
   PR: "Request for Payment",
   CAC: "Cash Advance Completion"
 };
@@ -86,6 +87,20 @@ const REQUIRED_FIELDS = {
     ["bank", "Bank"],
     ["account", "No rekening"],
     ["description", "Keterangan pengajuan"]
+  ],
+  SPPD: [
+    ["date", "Tanggal"],
+    ["requestor", "Nama karyawan"],
+    ["rank", "Jabatan"],
+    ["costCenter", "Cost center"],
+    ["department", "Departemen"],
+    ["location", "Unit kerja / lokasi"],
+    ["tripDestination", "Tujuan"],
+    ["description", "Keperluan SPPD"],
+    ["tripDuration", "Lama perjalanan"],
+    ["departureDate", "Tanggal berangkat"],
+    ["returnDate", "Tanggal pulang"],
+    ["transportType", "Jenis kendaraan"]
   ]
 };
 
@@ -521,8 +536,10 @@ function totalItems(items, mode = "normal") {
   return items.reduce((sum, item) => {
     const price = Number(item.price || item.payment || 0);
     const qty = Number(item.qty || 0);
+    const people = Number(item.people || 1);
     const realization = Number(item.realization || 0);
     if (mode === "completion") return sum + (price - realization);
+    if (mode === "sppd") return sum + (price * qty * people);
     return sum + (price * qty);
   }, 0);
 }
@@ -544,7 +561,7 @@ function settlementFromItems(items) {
 
 function paymentRequestAmount(item) {
   if (item.payment) return Number(item.payment || 0);
-  return Number(item.price || 0) * Number(item.qty || 1);
+  return Number(item.price || 0) * Number(item.qty || 1) * Number(item.people || 1);
 }
 
 function signerNameForStep(record, key) {
@@ -726,9 +743,28 @@ function baseForm(type, config) {
 }
 
 function itemEditor(mode) {
-  const headers = mode === "completion"
+  const headers = mode === "sppd"
+    ? ["Detail Biaya", "Keterangan", "Orang", "Qty", "@ Biaya"]
+    : mode === "completion"
     ? ["Transaksi", "Payment Request", "Realisasi"]
     : ["Item / Transaksi", "Harga", "Qty"];
+  const tableHead = mode === "sppd" ? `
+            <tr>
+              <th style="width:48px">No</th>
+              <th>Detail Biaya</th>
+              <th style="width:160px">Keterangan</th>
+              <th style="width:90px">Orang</th>
+              <th style="width:90px">Qty</th>
+              <th style="width:160px">@ Biaya</th>
+              <th style="width:72px"></th>
+            </tr>` : `
+            <tr>
+              <th style="width:48px">No</th>
+              <th>${headers[0]}</th>
+              <th style="width:180px">${headers[1]}</th>
+              <th style="width:140px">${headers[2]}</th>
+              <th style="width:72px"></th>
+            </tr>`;
   return `
     <div class="panel nested-panel">
       <div class="panel-head">
@@ -738,13 +774,7 @@ function itemEditor(mode) {
       <div class="table-wrap">
         <table class="entry-table item-table" data-mode="${mode}">
           <thead>
-            <tr>
-              <th style="width:48px">No</th>
-              <th>${headers[0]}</th>
-              <th style="width:180px">${headers[1]}</th>
-              <th style="width:140px">${headers[2]}</th>
-              <th style="width:72px"></th>
-            </tr>
+            ${tableHead}
           </thead>
           <tbody></tbody>
         </table>
@@ -804,7 +834,7 @@ function referenceRecords(types) {
       if (record.type !== "PR") return false;
       if (completedPrIds.has(record.id)) return false;
       const source = state.records.find(item => item.id === record.sourceId);
-      return source?.type === "CAR" && source.carType === "Uang Muka";
+      return (source?.type === "CAR" && source.carType === "Uang Muka") || source?.type === "SPPD";
     });
   }
   const usedSourceIds = new Set(state.records.filter(record => record.type === "PR" && record.sourceId).map(record => record.sourceId));
@@ -890,9 +920,38 @@ function initForms() {
         <input name="paymentRef" placeholder="Opsional">
       </div>`
   });
+  baseForm("SPPD", {
+    heading: "Pengajuan Surat Perintah Perjalanan Dinas",
+    itemMode: "sppd",
+    extra: `
+      <div class="field">
+        <label>Tujuan</label>
+        <input name="tripDestination" placeholder="Kota / lokasi tujuan">
+      </div>
+      <div class="field">
+        <label>Lama Perjalanan</label>
+        <input name="tripDuration" placeholder="Contoh: 2 hari">
+      </div>
+      <div class="field">
+        <label>Tanggal Berangkat</label>
+        <input name="departureDate" type="date">
+      </div>
+      <div class="field">
+        <label>Tanggal Pulang</label>
+        <input name="returnDate" type="date">
+      </div>
+      <div class="field">
+        <label>Jenis Kendaraan</label>
+        <input name="transportType" placeholder="Pesawat / mobil / kereta">
+      </div>
+      <div class="field">
+        <label>Karyawan Pengikut</label>
+        <input name="companions" placeholder="Nama pengikut atau Nihil">
+      </div>`
+  });
   baseForm("PR", {
     heading: "Pengajuan Payment Request",
-    reference: referenceSelect("Referensi PO/CAR/SPK atau Kekurangan CAC", "sourceId", ["PO", "CAR", "SPK", "CAC"]),
+    reference: referenceSelect("Referensi PO/CAR/SPK/SPPD atau Kekurangan CAC", "sourceId", ["PO", "CAR", "SPK", "SPPD", "CAC"]),
     extra: `
       ${vendorPickerField("payee", "Payee", "Pilih atau ketik payee")}
       <div class="field">
@@ -971,7 +1030,15 @@ function addItemRow(table, data = {}) {
   const mode = table.dataset.mode;
   const tbody = table.querySelector("tbody");
   const row = document.createElement("tr");
-  row.innerHTML = mode === "completion" ? `
+  row.innerHTML = mode === "sppd" ? `
+    <td class="row-num"></td>
+    <td><input name="itemName" value="${escapeHtml(data.name || "")}" placeholder="Detail biaya"></td>
+    <td><input name="itemNote" value="${escapeHtml(data.note || "")}" placeholder="SK Perjadin / Aktual"></td>
+    <td><input name="itemPeople" type="number" min="0" value="${data.people || 1}" placeholder="1"></td>
+    <td><input name="itemQty" type="number" min="0" value="${data.qty || 1}" placeholder="1"></td>
+    <td><input name="itemPrice" class="money-input" data-money value="${data.price ? plainNumber(data.price) : ""}" placeholder="0"></td>
+    <td><button type="button" class="danger remove-row">Hapus</button></td>
+  ` : mode === "completion" ? `
     <td class="row-num"></td>
     <td><input name="itemName" value="${escapeHtml(data.name || "")}" placeholder="Transaksi"></td>
     <td><input name="itemPayment" class="money-input" data-money value="${data.payment ? plainNumber(data.payment) : data.price ? plainNumber(data.price) : ""}" placeholder="0"></td>
@@ -997,6 +1064,15 @@ function collectItems(form) {
   const mode = form.querySelector(".item-table").dataset.mode;
   return [...form.querySelectorAll(".item-table tbody tr")].map(row => {
     const get = name => row.querySelector(`[name="${name}"]`)?.value || "";
+    if (mode === "sppd") {
+      return {
+        name: get("itemName"),
+        note: get("itemNote"),
+        people: Number(get("itemPeople") || 0),
+        qty: Number(get("itemQty") || 0),
+        price: parseMoney(get("itemPrice"))
+      };
+    }
     if (mode === "completion") {
       return {
         name: get("itemName"),
@@ -1021,7 +1097,7 @@ function validateRequiredForm(form, items) {
     if (!String(value || "").trim()) missing.push(label);
   });
 
-  if (["PO", "CAR", "PR"].includes(type)) {
+  if (["PO", "CAR", "PR", "SPPD"].includes(type)) {
     const tableRows = [...form.querySelectorAll(".item-table tbody tr")];
     const usedRows = tableRows.filter(row => {
       const name = row.querySelector('[name="itemName"]')?.value?.trim();
@@ -1095,6 +1171,12 @@ function fillFromReference(form, sourceId) {
       qty: 1
     });
     form.elements.description.value = `Pembayaran kekurangan realisasi ${source.sourceRegister || source.register}`;
+  } else if (form.dataset.type === "PR" && source.type === "SPPD") {
+    source.items.forEach(item => addItemRow(table, {
+      name: item.name,
+      price: paymentRequestAmount(item),
+      qty: 1
+    }));
   } else {
     source.items.forEach(item => addItemRow(table, form.dataset.type === "CAC" && source.type === "PR" ? {
       ...item,
@@ -1133,7 +1215,7 @@ function handleSubmit(event) {
   record.exchangeRate = parseMoney(data.exchangeRate || 1) || 1;
   record.ppn = parseMoney(data.ppn);
   record.pph = parseMoney(data.pph);
-  record.total = totalItems(items, type === "CAC" ? "completion" : "normal") + record.ppn - record.pph;
+  record.total = totalItems(items, type === "CAC" ? "completion" : type === "SPPD" ? "sppd" : "normal") + record.ppn - record.pph;
   if (type === "CAC") {
     record.settlementType = settlementFromItems(items);
     record.shortageAmount = shortageAmountFromCompletion(record);
@@ -1304,6 +1386,7 @@ function renderDashboard() {
   byId("metricTotal").textContent = dashboardRecords.length;
   byId("metricPO").textContent = count("PO");
   byId("metricCAR").textContent = count("CAR");
+  byId("metricSPPD").textContent = count("SPPD");
   byId("metricPR").textContent = count("PR");
   byId("metricPRTotal").textContent = formatCurrencyValue(prPaymentTotal, "IDR");
   byId("metricApprovalPending").textContent = pendingApproval;
@@ -1488,6 +1571,7 @@ function metaRow(label, value) {
 function printTemplate(record) {
   if (record.type === "PO") return poPrintTemplate(record);
   if (record.type === "CAR") return carPrintTemplate(record);
+  if (record.type === "SPPD") return sppdPrintTemplate(record);
   if (record.type === "PR") return prPrintTemplate(record);
   return genericPrintTemplate(record);
 }
@@ -1619,6 +1703,53 @@ function carPrintTemplate(record) {
   `;
 }
 
+function sppdPrintTemplate(record) {
+  const total = totalItems(record.items || [], "sppd");
+  return `
+    <div class="print-sheet sppd-sheet">
+      <div class="sppd-top">
+        <img class="print-logo" src="assets/logo-puri.jpg" onerror="this.onerror=null;this.src='Logo%20Puri.jpg';" alt="">
+        <table class="meta-table sppd-number-box">
+          ${metaRow("Nomor Surat", record.register)}
+          ${metaRow("Tanggal", formatDate(record.date))}
+        </table>
+      </div>
+      <div class="sppd-title-band">
+        <div>BIAYA PERJALANAN DINAS (SPPD) KARYAWAN</div>
+        <div>PT. PURI PRIMA PERSADA</div>
+      </div>
+      <table class="meta-table sppd-info-table">
+        ${metaRow("Nama Karyawan", record.requestor)}
+        ${metaRow("Jabatan", record.rank)}
+        ${metaRow("Unit Kerja (HO / Operation)", record.location)}
+        ${metaRow("Tujuan", record.tripDestination)}
+        ${metaRow("Keperluan SPPD", record.description)}
+        ${metaRow("Lama Perjalanan", record.tripDuration)}
+        ${metaRow("Tanggal Berangkat", formatDate(record.departureDate))}
+        ${metaRow("Tanggal Pulang", formatDate(record.returnDate))}
+        ${metaRow("Jenis Kendaraan", record.transportType)}
+        ${metaRow("Karyawan Pengikut", record.companions || "Nihil")}
+      </table>
+      <div class="sppd-intro">Dengan ini mengajukan Biaya Perjalanan Dinas dengan rincian sebagai berikut:</div>
+      ${sppdItemTable(record)}
+      <table class="print-table sppd-total-table">
+        <tbody>
+          <tr>
+            <td>Total Perjalanan Dinas:</td>
+            <td class="money">${formatCurrencyValue(total, record.currency || "IDR")}</td>
+          </tr>
+          <tr class="sppd-red-row">
+            <td>Total Yang Diterima:</td>
+            <td class="money">${formatCurrencyValue(total, record.currency || "IDR")}</td>
+          </tr>
+        </tbody>
+      </table>
+      ${signatureBlock(record)}
+      ${printFooterBlock()}
+    </div>
+  `;
+}
+
 function prPrintTemplate(record) {
   const tax = taxSummary(record);
   const source = record.sourceId ? state.records.find(item => item.id === record.sourceId) : null;
@@ -1699,6 +1830,38 @@ function genericPrintTemplate(record) {
       ${signatureBlock(record)}
       ${printFooterBlock()}
     </div>
+  `;
+}
+
+function sppdItemTable(record) {
+  return `
+    <table class="print-table sppd-cost-table">
+      <thead>
+        <tr>
+          <th style="width:34px">No</th>
+          <th>Detail Biaya</th>
+          <th style="width:160px">Keterangan</th>
+          <th style="width:54px">x Orang</th>
+          <th style="width:54px">x Qty</th>
+          <th style="width:120px">@ Biaya</th>
+          <th style="width:130px">Total Biaya</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${(record.items || []).map((item, index) => {
+          const total = paymentRequestAmount(item);
+          return `<tr>
+            <td class="num">${index + 1}</td>
+            <td>${escapeHtml(item.name || "")}</td>
+            <td>${escapeHtml(item.note || "")}</td>
+            <td class="num">${plainNumber(item.people || 1)}</td>
+            <td class="num">${plainNumber(item.qty || 1)}</td>
+            <td class="money">${formatCurrencyValue(item.price, record.currency || "IDR")}</td>
+            <td class="money">${formatCurrencyValue(total, record.currency || "IDR")}</td>
+          </tr>`;
+        }).join("")}
+      </tbody>
+    </table>
   `;
 }
 

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Sistem Procurement HRDGA PPP</title>
   <link rel="preload" href="assets/login-background.png" as="image">
-  <link rel="stylesheet" href="styles.css?v=20260813-cac-payment">
+  <link rel="stylesheet" href="styles.css?v=20260826-sppd">
 </head>
 <body>
   <section id="loginScreen" class="login-screen no-print">
@@ -41,6 +41,7 @@
         <button class="nav-button" data-view="po">Purchase Order</button>
         <button class="nav-button" data-view="spk">Surat Perintah Kerja</button>
         <button class="nav-button" data-view="car">Cash Advance Request</button>
+        <button class="nav-button admin-only" data-view="sppd">SPPD</button>
         <button class="nav-button" data-view="pr">Payment Request</button>
         <button class="nav-button" data-view="cac">Cash Advance Completion</button>
         <button class="nav-button" data-view="vendors">Vendor & Payee</button>
@@ -52,7 +53,7 @@
       <header class="topbar no-print">
         <div>
           <h1>Sistem Pengajuan Procurement</h1>
-          <p>PO, SPK, CAR, Payment Request, dan pertanggungjawaban CAR.</p>
+          <p>PO, SPK, CAR, SPPD, Payment Request, dan pertanggungjawaban.</p>
           <p id="cloudStatus" class="cloud-status">Mode lokal</p>
         </div>
         <div class="top-actions">
@@ -72,6 +73,7 @@
           <article class="metric dashboard-standard"><span>Total Record</span><strong id="metricTotal">0</strong></article>
           <article class="metric dashboard-standard"><span>PO</span><strong id="metricPO">0</strong></article>
           <article class="metric dashboard-standard"><span>CAR</span><strong id="metricCAR">0</strong></article>
+          <article class="metric dashboard-standard admin-only"><span>SPPD</span><strong id="metricSPPD">0</strong></article>
           <article class="metric dashboard-standard"><span>PR</span><strong id="metricPR">0</strong></article>
           <article class="metric dashboard-standard admin-only"><span>Total Pengajuan PR</span><strong id="metricPRTotal">Rp0</strong></article>
           <article class="metric dashboard-approval"><span>Belum Approve</span><strong id="metricApprovalPending">0</strong></article>
@@ -89,7 +91,7 @@
           </div>
           <div class="flow-grid">
             <div><b>Purchase Order</b><span>Isi item dan harga, lalu tarik data PO saat membuat Payment Request.</span></div>
-            <div><b>Cash Advance</b><span>Cash Advance Request, Payment Request, lalu Cash Advance Completion untuk tipe uang muka.</span></div>
+            <div><b>Cash Advance & SPPD</b><span>CAR atau SPPD dapat ditarik ke Payment Request, lalu dipertanggungjawabkan di Completion.</span></div>
             <div><b>Register</b><span>Nomor otomatis: urut/departemen-PPP/jenis form/bulan romawi/tahun.</span></div>
           </div>
         </div>
@@ -105,6 +107,7 @@
       <section id="po" class="view no-print"></section>
       <section id="spk" class="view no-print"></section>
       <section id="car" class="view no-print"></section>
+      <section id="sppd" class="view no-print admin-only"></section>
       <section id="pr" class="view no-print"></section>
       <section id="cac" class="view no-print"></section>
 
@@ -165,6 +168,7 @@
                 <option value="PO">Purchase Order</option>
                 <option value="SPK">Surat Perintah Kerja</option>
                 <option value="CAR">Cash Advance Request</option>
+                <option value="SPPD">SPPD</option>
                 <option value="PR">Payment Request</option>
                 <option value="CAC">Cash Advance Completion</option>
               </select>
@@ -232,8 +236,8 @@
     </div>
   </div>
 
-  <script src="cloud-config.js?v=20260813-cac-payment"></script>
-  <script src="cloud-store.js?v=20260813-cac-payment"></script>
-  <script src="script.js?v=20260813-cac-payment"></script>
+  <script src="cloud-config.js?v=20260826-sppd"></script>
+  <script src="cloud-store.js?v=20260826-sppd"></script>
+  <script src="script.js?v=20260826-sppd"></script>
 </body>
 </html>
