@@ -95,6 +95,7 @@ const REQUIRED_FIELDS = {
     ["costCenter", "Cost center"],
     ["department", "Departemen"],
     ["location", "Unit kerja / lokasi"],
+    ["employeeName", "Nama karyawan dinas"],
     ["tripDestination", "Tujuan"],
     ["description", "Keperluan SPPD"],
     ["tripDuration", "Lama perjalanan"],
@@ -808,6 +809,20 @@ function locationBlock() {
   `;
 }
 
+function companionEditor() {
+  return `
+    <div class="field full companion-editor">
+      <div class="panel nested-panel compact-nested">
+        <div class="panel-head">
+          <h2>Karyawan Pengikut</h2>
+          <button type="button" class="ghost add-companion">Tambah Pengikut</button>
+        </div>
+        <div class="companion-list"></div>
+      </div>
+    </div>
+  `;
+}
+
 function referenceSelect(label, name, types) {
   const records = referenceRecords(types);
   return `
@@ -925,6 +940,10 @@ function initForms() {
     itemMode: "sppd",
     extra: `
       <div class="field">
+        <label>Nama Karyawan Dinas</label>
+        <input name="employeeName" placeholder="Nama karyawan yang dinas">
+      </div>
+      <div class="field">
         <label>Tujuan</label>
         <input name="tripDestination" placeholder="Kota / lokasi tujuan">
       </div>
@@ -944,10 +963,7 @@ function initForms() {
         <label>Jenis Kendaraan</label>
         <input name="transportType" placeholder="Pesawat / mobil / kereta">
       </div>
-      <div class="field">
-        <label>Karyawan Pengikut</label>
-        <input name="companions" placeholder="Nama pengikut atau Nihil">
-      </div>`
+      ${companionEditor()}`
   });
   baseForm("PR", {
     heading: "Pengajuan Payment Request",
@@ -985,11 +1001,18 @@ function initForms() {
 
   document.querySelectorAll(".request-form").forEach(form => {
     addItemRow(form.querySelector(".item-table"));
+    const companionList = form.querySelector(".companion-list");
+    if (companionList) addCompanionRow(companionList);
     form.addEventListener("click", event => {
       if (event.target.classList.contains("add-row")) addItemRow(form.querySelector(".item-table"));
       if (event.target.classList.contains("remove-row")) {
         event.target.closest("tr").remove();
         renumberRows(form.querySelector(".item-table"));
+      }
+      if (event.target.classList.contains("add-companion")) addCompanionRow(form.querySelector(".companion-list"));
+      if (event.target.classList.contains("remove-companion")) {
+        event.target.closest(".companion-row").remove();
+        if (!form.querySelectorAll(".companion-row").length) addCompanionRow(form.querySelector(".companion-list"));
       }
     });
     form.addEventListener("input", event => {
@@ -1020,10 +1043,26 @@ function initForms() {
         if (submit) submit.textContent = "Simpan Pengajuan";
         form.querySelector(".item-table tbody").innerHTML = "";
         addItemRow(form.querySelector(".item-table"));
+        const companions = form.querySelector(".companion-list");
+        if (companions) {
+          companions.innerHTML = "";
+          addCompanionRow(companions);
+        }
         applySigners(form);
       }, 0);
     });
   });
+}
+
+function addCompanionRow(list, value = "") {
+  if (!list) return;
+  const row = document.createElement("div");
+  row.className = "companion-row";
+  row.innerHTML = `
+    <input name="companionName" value="${escapeHtml(value || "")}" placeholder="Nama karyawan pengikut">
+    <button type="button" class="danger remove-companion">Hapus</button>
+  `;
+  list.appendChild(row);
 }
 
 function addItemRow(table, data = {}) {
@@ -1087,6 +1126,12 @@ function collectItems(form) {
       qty: Number(get("itemQty") || 0)
     };
   }).filter(item => item.name || item.price || item.payment || item.realization);
+}
+
+function collectCompanions(form) {
+  return [...form.querySelectorAll('[name="companionName"]')]
+    .map(input => input.value.trim())
+    .filter(Boolean);
 }
 
 function validateRequiredForm(form, items) {
@@ -1219,6 +1264,9 @@ function handleSubmit(event) {
   if (type === "CAC") {
     record.settlementType = settlementFromItems(items);
     record.shortageAmount = shortageAmountFromCompletion(record);
+  }
+  if (type === "SPPD") {
+    record.companions = collectCompanions(form);
   }
   record.subject = data.subject || data.purpose || data.carType || data.description || FORM_TITLES[type];
   if (type === "PR") {
@@ -1548,7 +1596,7 @@ function populateFormForEdit(record) {
   }
 
   Object.entries(record).forEach(([key, value]) => {
-    if (["items", "ppn", "pph", "exchangeRate"].includes(key)) return;
+    if (["items", "ppn", "pph", "exchangeRate", "companions"].includes(key)) return;
     setElementValue(form, key, value);
   });
   setElementValue(form, "exchangeRate", record.exchangeRate ? plainNumber(record.exchangeRate) : "1");
@@ -1560,6 +1608,14 @@ function populateFormForEdit(record) {
   table.querySelector("tbody").innerHTML = "";
   (record.items || []).forEach(item => addItemRow(table, item));
   if (!record.items?.length) addItemRow(table);
+  const companions = form.querySelector(".companion-list");
+  if (companions) {
+    companions.innerHTML = "";
+    const companionValues = Array.isArray(record.companions)
+      ? record.companions
+      : String(record.companions || "").split(",").map(item => item.trim()).filter(Boolean);
+    (companionValues.length ? companionValues : [""]).forEach(name => addCompanionRow(companions, name));
+  }
   updateFormTotal(form);
   form.scrollIntoView({ behavior: "smooth" });
 }
@@ -1705,6 +1761,9 @@ function carPrintTemplate(record) {
 
 function sppdPrintTemplate(record) {
   const total = totalItems(record.items || [], "sppd");
+  const companions = Array.isArray(record.companions)
+    ? record.companions.join(", ")
+    : record.companions || "Nihil";
   return `
     <div class="print-sheet sppd-sheet">
       <div class="sppd-top">
@@ -1719,7 +1778,7 @@ function sppdPrintTemplate(record) {
         <div>PT. PURI PRIMA PERSADA</div>
       </div>
       <table class="meta-table sppd-info-table">
-        ${metaRow("Nama Karyawan", record.requestor)}
+        ${metaRow("Nama Karyawan Dinas", record.employeeName || record.requestor)}
         ${metaRow("Jabatan", record.rank)}
         ${metaRow("Unit Kerja (HO / Operation)", record.location)}
         ${metaRow("Tujuan", record.tripDestination)}
@@ -1728,7 +1787,7 @@ function sppdPrintTemplate(record) {
         ${metaRow("Tanggal Berangkat", formatDate(record.departureDate))}
         ${metaRow("Tanggal Pulang", formatDate(record.returnDate))}
         ${metaRow("Jenis Kendaraan", record.transportType)}
-        ${metaRow("Karyawan Pengikut", record.companions || "Nihil")}
+        ${metaRow("Karyawan Pengikut", companions || "Nihil")}
       </table>
       <div class="sppd-intro">Dengan ini mengajukan Biaya Perjalanan Dinas dengan rincian sebagai berikut:</div>
       ${sppdItemTable(record)}

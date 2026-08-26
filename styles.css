@@ -420,6 +420,28 @@ textarea {
   text-align: right;
 }
 
+.compact-nested {
+  margin-bottom: 0;
+}
+
+.companion-list {
+  display: grid;
+  gap: 8px;
+}
+
+.companion-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+.companion-row input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 9px 10px;
+}
+
 .mini {
   font-size: 12px;
   color: var(--muted);
@@ -1105,6 +1127,14 @@ textarea {
 
   .entry-table {
     min-width: 620px;
+  }
+
+  .companion-row {
+    grid-template-columns: 1fr;
+  }
+
+  .companion-row button {
+    width: 100%;
   }
 
   .preview-modal-head {
