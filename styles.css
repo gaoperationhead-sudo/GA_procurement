@@ -1159,6 +1159,11 @@ textarea {
     margin: 0;
   }
 
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
   body {
     background: #fff;
   }
@@ -1187,5 +1192,23 @@ textarea {
     box-shadow: none;
     margin: 0;
     page-break-after: always;
+  }
+
+  .sppd-title-band,
+  .sppd-cost-table th,
+  .sppd-red-row td {
+    background: #990000 !important;
+    color: #fff !important;
+  }
+
+  .print-table th {
+    background: #222 !important;
+    color: #fff !important;
+  }
+
+  .car-sheet .print-table th,
+  .po-sheet .print-table th {
+    background: #f0f0f0 !important;
+    color: #111 !important;
   }
 }
