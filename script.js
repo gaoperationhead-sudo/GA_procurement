@@ -1,6 +1,6 @@
 const COST_CENTERS = ["HRDGA", "Operasional & network development", "Legal", "Finance & Accounting"];
 const LOCATIONS = ["Head Office", "Lw. Liang 1", "Lw. Liang 2", "Lw. Liang 3", "Cianjur 1", "Cianjur 2", "Cigudeg 1", "Cigudeg 2", "Jasinga 1", "Jasinga 2", "Dadali", "Cimanggu", "Kemang", "Pasir Angin 1", "Cipayung", "Cibogo", "Cigombong", "Cijeruk", "Rumpin 1", "Rumpin 2", "Klapanunggal 1", "Klapanunggal 2", "Tanjungsari 1", "Tanjungsari 2", "Sukamakmur", "Tanjungkerta", "Kuningan 1", "Kuningan 2", "Muara Sanding 1", "Muara Sanding 2", "Cabang Bungin 1", "Cabang Bungin 2"];
-const RANKS = ["Worker", "Staff", "Supervisor", "Manager", "General Manager"];
+const RANKS = ["Worker", "Staff", "Supervisor", "Manager", "General Manager", "Direksi"];
 const CURRENCIES = ["IDR", "USD", "SGD", "EUR", "JPY"];
 const CAR_TYPES = ["Vendor", "Uang Muka", "Reimburse"];
 const DEPARTMENT_CODES = {
