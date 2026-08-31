@@ -27,6 +27,7 @@ body:not(.is-admin) .admin-only {
 }
 
 body.is-approver nav .nav-button:not([data-view="dashboard"]):not([data-view="records"]),
+body.is-approver .nav-group,
 body.is-approver .dashboard-standard {
   display: none !important;
 }
@@ -152,12 +153,37 @@ nav {
   gap: 7px;
 }
 
+.nav-group {
+  display: grid;
+  gap: 6px;
+}
+
+.nav-group summary {
+  list-style: none;
+  color: #b7c2cf;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  padding: 10px 12px 4px;
+  cursor: pointer;
+}
+
+.nav-group summary::-webkit-details-marker {
+  display: none;
+}
+
 .nav-button {
   text-align: left;
   color: #d9e0e8;
   background: transparent;
   border-radius: 6px;
   padding: 11px 12px;
+}
+
+.nav-sub {
+  margin-left: 10px;
+  padding-left: 14px;
 }
 
 .nav-button.active,
@@ -250,6 +276,35 @@ h1 {
 
 .view.active {
   display: block;
+}
+
+.is-hidden {
+  display: none !important;
+}
+
+.transaction-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  padding: 8px;
+}
+
+.transaction-toolbar button {
+  padding: 8px 12px;
+}
+
+.transaction-home {
+  margin-bottom: 12px;
+}
+
+.transaction-filter {
+  align-items: end;
+}
+
+.search-action-field button {
+  width: 100%;
 }
 
 .metric-grid {
@@ -474,6 +529,16 @@ textarea {
 .record-card strong {
   display: block;
   font-size: 14px;
+}
+
+.record-select-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
 }
 
 .record-meta {

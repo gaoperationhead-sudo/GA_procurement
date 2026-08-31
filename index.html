@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Sistem Procurement HRDGA PPP</title>
   <link rel="preload" href="assets/login-background.png" as="image">
-  <link rel="stylesheet" href="styles.css?v=20260826-print-color">
+  <link rel="stylesheet" href="styles.css?v=20260831-menu-workspace">
 </head>
 <body>
   <section id="loginScreen" class="login-screen no-print">
@@ -38,13 +38,19 @@
       </div>
       <nav>
         <button class="nav-button active" data-view="dashboard">Dashboard</button>
-        <button class="nav-button" data-view="po">Purchase Order</button>
-        <button class="nav-button" data-view="spk">Surat Perintah Kerja</button>
-        <button class="nav-button" data-view="car">Cash Advance Request</button>
-        <button class="nav-button admin-only" data-view="sppd">SPPD</button>
-        <button class="nav-button" data-view="pr">Payment Request</button>
-        <button class="nav-button" data-view="cac">Cash Advance Completion</button>
-        <button class="nav-button" data-view="vendors">Vendor & Payee</button>
+        <details class="nav-group" open>
+          <summary>Transaction</summary>
+          <button class="nav-button nav-sub" data-view="po">Purchase Order</button>
+          <button class="nav-button nav-sub" data-view="spk">Surat Perintah Kerja</button>
+          <button class="nav-button nav-sub" data-view="car">Cash Advance Request</button>
+          <button class="nav-button nav-sub admin-only" data-view="sppd">SPPD</button>
+          <button class="nav-button nav-sub" data-view="pr">Payment Request</button>
+          <button class="nav-button nav-sub" data-view="cac">Cash Advance Completion</button>
+        </details>
+        <details class="nav-group" open>
+          <summary>Master</summary>
+          <button class="nav-button nav-sub" data-view="vendors">Vendor & Payee</button>
+        </details>
         <button class="nav-button" data-view="records">Record</button>
       </nav>
     </aside>
@@ -236,8 +242,8 @@
     </div>
   </div>
 
-  <script src="cloud-config.js?v=20260826-print-color"></script>
-  <script src="cloud-store.js?v=20260826-print-color"></script>
-  <script src="script.js?v=20260826-print-color"></script>
+  <script src="cloud-config.js?v=20260831-menu-workspace"></script>
+  <script src="cloud-store.js?v=20260831-menu-workspace"></script>
+  <script src="script.js?v=20260831-menu-workspace"></script>
 </body>
 </html>

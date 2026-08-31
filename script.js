@@ -41,8 +41,10 @@ const FORM_TITLES = {
   PR: "Request for Payment",
   CAC: "Cash Advance Completion"
 };
+const TRANSACTION_TYPES = ["PO", "SPK", "CAR", "SPPD", "PR", "CAC"];
 const ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII"];
 const STORAGE_KEY = "ppp-procurement-system-v1";
+const DRAFT_KEY = "ppp-procurement-drafts-v1";
 const STORAGE_BACKUP_KEY = "ppp-procurement-system-v1-last-backup";
 
 let state = loadState();
@@ -659,8 +661,9 @@ function terbilang(value) {
 
 function baseForm(type, config) {
   const target = byId(type.toLowerCase());
-  target.innerHTML = `
-    <form class="panel request-form" data-type="${type}">
+  const viewId = type.toLowerCase();
+  const formHtml = `
+    <form class="panel request-form transaction-form is-hidden" data-type="${type}">
       <div class="panel-head">
         <h2>${config.heading}</h2>
         <span class="mini">Nomor dibuat otomatis saat disimpan</span>
@@ -740,6 +743,56 @@ function baseForm(type, config) {
         <button type="submit" class="primary">Simpan Pengajuan</button>
       </div>
     </form>
+  `;
+  target.innerHTML = transactionShell(type, config.heading, formHtml, viewId);
+}
+
+function transactionShell(type, heading, formHtml, viewId) {
+  return `
+    <div class="transaction-toolbar panel">
+      <button type="button" class="ghost transaction-new" data-type="${type}">New</button>
+      <button type="button" class="ghost transaction-save" data-type="${type}">Save</button>
+      <button type="button" class="primary transaction-submit" data-type="${type}">Submit</button>
+      <button type="button" class="secondary transaction-close-order" data-type="${type}">Close Order</button>
+    </div>
+    <div class="panel transaction-home" data-type="${type}">
+      <div class="panel-head">
+        <h2>${heading}</h2>
+        <span class="mini">Cari transaksi ${FORM_TITLES[type]} yang sudah terecord.</span>
+      </div>
+      <div class="transaction-filter form-grid">
+        <div class="field">
+          <label>Lokasi</label>
+          <select id="${viewId}SearchLocation">
+            <option value="ALL">Semua Lokasi</option>
+            ${LOCATIONS.map(location => `<option value="${escapeHtml(location)}">${escapeHtml(location)}</option>`).join("")}
+          </select>
+        </div>
+        <div class="field">
+          <label>Departemen</label>
+          <select id="${viewId}SearchDepartment">
+            <option value="ALL">Semua Departemen</option>
+            ${COST_CENTERS.map(department => `<option value="${escapeHtml(department)}">${escapeHtml(department)}</option>`).join("")}
+          </select>
+        </div>
+        <div class="field">
+          <label>Mulai Tanggal</label>
+          <input id="${viewId}SearchStart" type="date">
+        </div>
+        <div class="field">
+          <label>Sampai Tanggal</label>
+          <input id="${viewId}SearchEnd" type="date">
+        </div>
+        <div class="field search-action-field">
+          <label>&nbsp;</label>
+          <button type="button" class="primary transaction-search" data-type="${type}">Search</button>
+        </div>
+      </div>
+      <div id="${viewId}SearchResults" class="record-list transaction-results">
+        <div class="empty">Klik Search untuk menampilkan transaksi ${FORM_TITLES[type]}.</div>
+      </div>
+    </div>
+    ${formHtml}
   `;
 }
 
@@ -1289,7 +1342,157 @@ function handleSubmit(event) {
   delete form.dataset.editId;
   form.querySelector(".item-table tbody").innerHTML = "";
   addItemRow(form.querySelector(".item-table"));
-  showView("records");
+  clearTransactionDraft(type);
+  hideTransactionForm(type);
+  showView(type.toLowerCase());
+  renderTransactionResults(type);
+}
+
+function draftState() {
+  try {
+    return JSON.parse(localStorage.getItem(DRAFT_KEY)) || {};
+  } catch {
+    return {};
+  }
+}
+
+function saveDraftState(drafts) {
+  localStorage.setItem(DRAFT_KEY, JSON.stringify(drafts || {}));
+}
+
+function clearTransactionDraft(type) {
+  const drafts = draftState();
+  delete drafts[type];
+  saveDraftState(drafts);
+}
+
+function transactionForm(type) {
+  return byId(type.toLowerCase())?.querySelector("form.request-form") || null;
+}
+
+function collectFormDraft(form) {
+  const data = Object.fromEntries(new FormData(form).entries());
+  return {
+    ...data,
+    items: collectItems(form),
+    companions: form.dataset.type === "SPPD" ? collectCompanions(form) : []
+  };
+}
+
+function applyFormDraft(form, draft) {
+  if (!form || !draft) return;
+  Object.entries(draft).forEach(([key, value]) => {
+    if (["items", "companions"].includes(key)) return;
+    setElementValue(form, key, value);
+  });
+  const table = form.querySelector(".item-table");
+  if (table) {
+    table.querySelector("tbody").innerHTML = "";
+    (draft.items?.length ? draft.items : [{}]).forEach(item => addItemRow(table, item));
+  }
+  const companions = form.querySelector(".companion-list");
+  if (companions) {
+    companions.innerHTML = "";
+    (draft.companions?.length ? draft.companions : [""]).forEach(name => addCompanionRow(companions, name));
+  }
+  applySigners(form);
+  updateFormTotal(form);
+}
+
+function showTransactionForm(type, useDraft = true) {
+  const form = transactionForm(type);
+  if (!form) return;
+  form.classList.remove("is-hidden");
+  form.scrollIntoView({ behavior: "smooth", block: "start" });
+  if (!form.dataset.editId && useDraft) {
+    const draft = draftState()[type];
+    if (draft) applyFormDraft(form, draft);
+  }
+}
+
+function hideTransactionForm(type) {
+  const form = transactionForm(type);
+  if (form) form.classList.add("is-hidden");
+}
+
+function newTransaction(type) {
+  const form = transactionForm(type);
+  if (!form) return;
+  form.reset();
+  delete form.dataset.editId;
+  setTimeout(() => {
+    const hint = form.querySelector(".panel-head .mini");
+    const submit = form.querySelector('button[type="submit"]');
+    if (hint) hint.textContent = "Nomor dibuat otomatis saat disimpan";
+    if (submit) submit.textContent = "Simpan Pengajuan";
+    showTransactionForm(type);
+  }, 0);
+}
+
+function saveTransactionDraft(type) {
+  const form = transactionForm(type);
+  if (!form || form.classList.contains("is-hidden")) {
+    alert("Klik New terlebih dahulu untuk membuka form.");
+    return;
+  }
+  const drafts = draftState();
+  drafts[type] = collectFormDraft(form);
+  saveDraftState(drafts);
+  alert("Draft tersimpan di browser ini.");
+}
+
+function submitTransaction(type) {
+  const form = transactionForm(type);
+  if (!form || form.classList.contains("is-hidden")) {
+    alert("Klik New terlebih dahulu untuk membuka form.");
+    return;
+  }
+  form.requestSubmit();
+}
+
+function recordDateInRange(record, start, end) {
+  const date = String(record.date || "").slice(0, 10);
+  if (!date) return false;
+  if (start && date < start) return false;
+  if (end && date > end) return false;
+  return true;
+}
+
+function renderTransactionResults(type) {
+  const viewId = type.toLowerCase();
+  const results = byId(`${viewId}SearchResults`);
+  if (!results) return;
+  const location = byId(`${viewId}SearchLocation`)?.value || "ALL";
+  const department = byId(`${viewId}SearchDepartment`)?.value || "ALL";
+  const start = byId(`${viewId}SearchStart`)?.value || "";
+  const end = byId(`${viewId}SearchEnd`)?.value || "";
+  const records = visibleRecords().filter(record => {
+    if (record.type !== type) return false;
+    if (location !== "ALL" && record.location !== location) return false;
+    if (department !== "ALL" && record.department !== department) return false;
+    return recordDateInRange(record, start, end);
+  });
+  results.innerHTML = recordCards(records, {
+    selectable: true,
+    selectName: `${viewId}SelectedRecord`
+  });
+}
+
+function closeSelectedTransaction(type) {
+  const view = byId(type.toLowerCase());
+  const selected = view?.querySelector(".transaction-record-select:checked");
+  if (!selected) {
+    alert("Pilih dokumen transaksi dari hasil search terlebih dahulu.");
+    return;
+  }
+  const record = visibleRecords().find(item => item.id === selected.value);
+  if (!record) return;
+  if (!confirm(`Close Order akan menghapus ${record.register}. Lanjutkan?`)) return;
+  state.records = state.records.filter(item => item.id !== selected.value);
+  saveState();
+  rebuildReferenceForms();
+  showView(type.toLowerCase());
+  renderTransactionResults(type);
 }
 
 function rebuildReferenceForms() {
@@ -1483,11 +1686,12 @@ function approvalAction(record) {
   `;
 }
 
-function recordCards(records) {
+function recordCards(records, options = {}) {
   if (!records.length) return `<div class="empty">Belum ada record.</div>`;
   return records.map(record => `
     <article class="record-card">
       <div>
+        ${options.selectable ? `<label class="record-select-line"><input class="transaction-record-select" type="radio" name="${escapeHtml(options.selectName || "selectedRecord")}" value="${escapeHtml(record.id)}"> Pilih dokumen</label>` : ""}
         <strong>${escapeHtml(FORM_TITLES[record.type])} - ${escapeHtml(record.register)}</strong>
         <div class="record-meta">${escapeHtml(formatDate(record.date))} | ${escapeHtml(record.requestor || "-")} | ${escapeHtml(record.location || "-")} | ${formatCurrencyValue(record.total, record.currency || "IDR")}</div>
         ${isAdmin() && record.createdByEmail ? `<div class="record-meta">Dibuat oleh: ${escapeHtml(record.createdByEmail)}</div>` : ""}
@@ -1583,6 +1787,7 @@ function populateFormForEdit(record) {
   showView(viewId);
   const form = byId(viewId).querySelector("form.request-form");
   if (!form) return;
+  showTransactionForm(record.type, false);
   form.dataset.editId = record.id;
   form.querySelector(".panel-head .mini").textContent = `Mode edit: ${record.register}`;
   form.querySelector('button[type="submit"]').textContent = "Update Pengajuan";
@@ -2133,6 +2338,8 @@ function signatureBlock(record) {
 function showView(id) {
   document.querySelectorAll(".view").forEach(view => view.classList.toggle("active", view.id === id));
   document.querySelectorAll(".nav-button").forEach(button => button.classList.toggle("active", button.dataset.view === id));
+  const transactionType = TRANSACTION_TYPES.find(type => type.toLowerCase() === id);
+  if (transactionType) hideTransactionForm(transactionType);
   if (id !== "records") {
     byId("printArea").innerHTML = "";
     byId("printArea").style.display = "none";
@@ -2145,6 +2352,21 @@ document.addEventListener("click", event => {
 
   const jump = event.target.closest("[data-view-jump]");
   if (jump) showView(jump.dataset.viewJump);
+
+  const transactionNew = event.target.closest(".transaction-new");
+  if (transactionNew) newTransaction(transactionNew.dataset.type);
+
+  const transactionSave = event.target.closest(".transaction-save");
+  if (transactionSave) saveTransactionDraft(transactionSave.dataset.type);
+
+  const transactionSubmit = event.target.closest(".transaction-submit");
+  if (transactionSubmit) submitTransaction(transactionSubmit.dataset.type);
+
+  const transactionSearch = event.target.closest(".transaction-search");
+  if (transactionSearch) renderTransactionResults(transactionSearch.dataset.type);
+
+  const transactionCloseOrder = event.target.closest(".transaction-close-order");
+  if (transactionCloseOrder) closeSelectedTransaction(transactionCloseOrder.dataset.type);
 
   const preview = event.target.closest(".preview-record");
   if (preview) {
