@@ -1642,7 +1642,6 @@ function renderDashboard() {
   byId("metricPRTotal").textContent = formatCurrencyValue(prPaymentTotal, "IDR");
   byId("metricApprovalPending").textContent = pendingApproval;
   byId("metricApprovalDone").textContent = doneApproval;
-  byId("recentRecords").innerHTML = recordCards((isApprover() ? dashboardRecords.filter(record => record.type === "PR") : dashboardRecords).slice(0, 5));
 }
 
 function renderRecords() {
